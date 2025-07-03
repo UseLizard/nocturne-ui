@@ -441,19 +441,16 @@ function App() {
   }, [isAuthenticated, refreshPlaybackState]);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      const hasSeenTutorial = localStorage.getItem("hasSeenTutorial") === 'true';
-      if (hasSeenTutorial) {
-        setShowTutorial(false);
-        const shouldStartWithNowPlaying = localStorage.getItem('startWithNowPlaying') === 'true';
-        if (shouldStartWithNowPlaying) {
-          setActiveSection('nowPlaying');
-        }
-      } else {
-        setShowTutorial(true);
-      }
+    // Skip authentication check and go directly to media interface
+    const hasSeenTutorial = localStorage.getItem("hasSeenTutorial") === 'true';
+    if (hasSeenTutorial) {
+      setShowTutorial(false);
+      // Default to media section for Bluetooth-first experience
+      setActiveSection('media');
+    } else {
+      setShowTutorial(true);
     }
-  }, [isAuthenticated, setActiveSection]);
+  }, [setActiveSection]);
 
   useEffect(() => {
     if (showTutorial) {
@@ -539,12 +536,8 @@ function App() {
   const handleTutorialComplete = () => {
     setShowTutorial(false);
     localStorage.setItem("hasSeenTutorial", "true");
-    const shouldStartWithNowPlaying = localStorage.getItem('startWithNowPlaying') === 'true';
-    if (shouldStartWithNowPlaying) {
-      setActiveSection('nowPlaying');
-    } else {
-      setActiveSection('recents');
-    }
+    // Go directly to media section for Bluetooth-first experience
+    setActiveSection('media');
   };
 
   const handleOpenContent = (id, type) => {
@@ -597,29 +590,19 @@ function App() {
 
   const isFlashing = isUpdating && updateStatus.stage === "flash";
 
-  const showConnectionLostScreen = initialCheckDone &&
-    !isFlashing &&
-    !pairingRequest &&
-    !showTetheringScreen &&
-    (
-      (initialConnectionFailed && !isInternetConnected && !hasEverConnectedThisSession) ||
-      (!hasEverConnectedThisSession && !isInternetConnected)
-    );
+  // With Bluetooth-only setup, we don't need internet connectivity for core functionality
+  const showConnectionLostScreen = false;
 
-  const displayNetworkBanner = initialCheckDone &&
-    !showConnectionLostScreen &&
-    !pairingRequest &&
-    showNetworkBanner &&
-    hasEverConnectedThisSession;
+  // Minimize network banner since Bluetooth functionality doesn't require internet
+  const displayNetworkBanner = false;
 
   let content;
   if (authIsLoading && !initialCheckDone) {
     content = null;
-  } else if (!isInternetConnected && !hasEverConnectedThisSession && initialCheckDone) {
-    content = <NetworkScreen isConnectionLost={true} />;
   } else if (showConnectionLostScreen) {
     content = <NetworkScreen isConnectionLost={true} deviceName={lastConnectedDevice?.name} />;
-  } else if (!isAuthenticated && initialCheckDone) {
+  } else if (false && !isAuthenticated && initialCheckDone) {
+    // Spotify auth disabled - all functionality handled via Android companion app
     content = <AuthContainer onAuthSuccess={handleAuthSuccess} />;
   } else if (showTutorial) {
     content = <Tutorial onComplete={handleTutorialComplete} />;

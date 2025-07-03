@@ -17,12 +17,10 @@ import {
   SettingsPlaybackIcon,
   SettingsSupportIcon,
   BluetoothIcon,
-  WifiMaxIcon,
 } from "../common/icons";
 import AccountInfo from "./AccountInfo";
 import SoftwareUpdate from "./SoftwareUpdate";
-import WiFiNetworks from "./network/WiFiNetworks";
-import BluetoothDevices from "./network/BluetoothDevices";
+import BluetoothSettings from "../bluetooth/BluetoothSettings";
 import { useSettings } from "../../contexts/SettingsContext";
 
 const settingsStructure = {
@@ -76,28 +74,14 @@ const settingsStructure = {
       },
     ],
   },
-  network: {
-    title: "Network",
-    icon: WifiMaxIcon,
-    type: "parent",
+  bluetooth: {
+    title: "Bluetooth",
+    icon: BluetoothIcon,
     items: [
       {
-        id: "wifi",
-        title: "Wi-Fi",
-        icon: WifiMaxIcon,
-        subpage: {
-          type: "custom",
-          component: WiFiNetworks,
-        },
-      },
-      {
-        id: "bluetooth",
-        title: "Bluetooth",
-        icon: BluetoothIcon,
-        subpage: {
-          type: "custom",
-          component: BluetoothDevices,
-        },
+        id: "bluetooth-settings",
+        type: "custom",
+        component: BluetoothSettings,
       },
     ],
   },

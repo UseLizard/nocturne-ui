@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import Sidebar from "../components/common/navigation/Sidebar";
 import HorizontalScroll from "../components/common/navigation/HorizontalScroll";
 import Settings from "../components/settings/Settings";
+import LocalMediaPlayer from "../components/media/LocalMediaPlayer";
 import { useGradientState } from "../hooks/useGradientState";
 import { useNavigation } from "../hooks/useNavigation";
 import { useSpotifyPlayerControls } from "../hooks/useSpotifyPlayerControls";
@@ -65,6 +66,8 @@ export default function Home({
       updateGradientColors(firstShowImage || null, "podcasts");
     } else if (activeSection === "settings") {
       updateGradientColors(null, "settings");
+    } else if (activeSection === "media") {
+      updateGradientColors(null, "media");
     }
   }, [
     activeSection,
@@ -760,6 +763,8 @@ export default function Home({
         return renderRadioSection();
       case "podcasts":
         return renderPodcastsSection();
+      case "media":
+        return <LocalMediaPlayer onClose={() => setActiveSection("recents")} />;
       case "settings":
         return (
           <Settings
@@ -776,6 +781,18 @@ export default function Home({
         );
     }
   };
+
+  // Render media section as full-screen like NowPlaying
+  if (activeSection === "media") {
+    return (
+      <div className="relative min-h-screen">
+        {renderContent()}
+        {showDonationModal && (
+          <DonationQRModal onClose={() => setShowDonationModal(false)} />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen">

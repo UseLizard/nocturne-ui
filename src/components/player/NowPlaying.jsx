@@ -5,6 +5,7 @@ import { useNavigation } from "../../hooks/useNavigation";
 import { useLyrics } from "../../hooks/useLyrics";
 import { useGestureControls } from "../../hooks/useGestureControls";
 import { useElapsedTime } from "../../hooks/useElapsedTime";
+import { useMediaScrollWheel } from "../../hooks/useScrollWheel";
 import ProgressBar from "./ProgressBar";
 import ScrollingText from "../common/ScrollingText";
 import {
@@ -53,12 +54,9 @@ export default function NowPlaying({
   
   const volumeTimerRef = useRef(null);
   const volumeLastAdjustedRef = useRef(0);
-  const lastWheelEventRef = useRef(0);
-  const wheelDeltaAccumulatorRef = useRef(0);
   const containerRef = useRef(null);
   const currentTrackIdRef = useRef(null);
   const prevVolumeRef = useRef(null);
-  const manualVolumeChangeRef = useRef(false);
   
   const isDJPlaylist =
     currentPlayback?.context?.uri === "spotify:playlist:37i9dQZF1EYkqdzj48dyYq";
@@ -123,8 +121,6 @@ export default function NowPlaying({
   }, [currentPlayback?.device?.volume_percent, updateVolumeFromDevice]);
   
   const showVolumeOverlay = useCallback(() => {
-    if (!manualVolumeChangeRef.current) return;
-    
     volumeLastAdjustedRef.current = Date.now();
     
     if (volumeTimerRef.current) {
@@ -147,8 +143,6 @@ export default function NowPlaying({
           visible: false,
           animation: "hidden"
         });
-        
-        manualVolumeChangeRef.current = false;
       }, 300);
     }, 1500);
   }, []);
@@ -161,6 +155,15 @@ export default function NowPlaying({
     };
   }, []);
   
+  // Unified scroll wheel for volume control (Spotify mode)
+  const { manualVolumeChangeRef } = useMediaScrollWheel({
+    containerRef,
+    onVolumeChange: setVolume,
+    currentVolume: volume,
+    showVolumeOverlay,
+    enabled: !isProgressScrubbing,
+  });
+  
   useEffect(() => {
     if (prevVolumeRef.current === null) {
       prevVolumeRef.current = volume;
@@ -169,10 +172,11 @@ export default function NowPlaying({
     
     if (prevVolumeRef.current !== volume && manualVolumeChangeRef.current) {
       showVolumeOverlay();
+      manualVolumeChangeRef.current = false;
     }
     
     prevVolumeRef.current = volume;
-  }, [volume, showVolumeOverlay]);
+  }, [volume, showVolumeOverlay, manualVolumeChangeRef]);
 
   useEffect(() => {
     if (currentPlayback?.shuffle_state !== undefined) {
@@ -227,53 +231,7 @@ export default function NowPlaying({
 
   const { trackName, artistName, albumArt, trackId, firstArtistId, albumId } = trackInfo;
 
-  const handleWheel = useCallback((e) => {
-    if (isProgressScrubbing) return;
-
-    const now = Date.now();
-    if (now - lastWheelEventRef.current < 50) {
-      e.preventDefault();
-      return;
-    }
-    lastWheelEventRef.current = now;
-
-    e.preventDefault();
-    e.stopPropagation();
-
-    const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-    wheelDeltaAccumulatorRef.current += delta;
-
-    if (Math.abs(wheelDeltaAccumulatorRef.current) >= 2) {
-      const direction = wheelDeltaAccumulatorRef.current > 0 ? 1 : -1;
-      const newVolume = Math.max(0, Math.min(100, volume + direction * 5));
-
-      wheelDeltaAccumulatorRef.current = 0;
-
-      if (newVolume !== volume) {
-        manualVolumeChangeRef.current = true;
-        setVolume(newVolume);
-      }
-    }
-  }, [isProgressScrubbing, volume, setVolume]);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    let options = { passive: false, capture: true };
-    
-    const handleWheelWithOptions = (e) => {
-      handleWheel(e);
-    };
-    
-    if (container) {
-      container.addEventListener("wheel", handleWheelWithOptions, options);
-    }
-
-    return () => {
-      if (container) {
-        container.removeEventListener("wheel", handleWheelWithOptions, options);
-      }
-    };
-  }, [handleWheel]);
+  // Removed old handleWheel implementation - now using unified useMediaScrollWheel
 
   useNavigation({
     containerRef,

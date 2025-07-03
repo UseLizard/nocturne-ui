@@ -6,6 +6,7 @@ import {
   RadioIcon,
   PodcastIcon,
   SettingsIcon,
+  SmartphoneIcon,
 } from "../../common/icons";
 import StatusBar from "./StatusBar";
 import { useSettings } from "../../../contexts/SettingsContext";
@@ -50,6 +51,7 @@ export default function Sidebar({ activeSection, setActiveSection }) {
         icon={NowPlayingIcon}
         label="Now Playing"
       />
+      <SidebarItem section="media" icon={SmartphoneIcon} label="Media" />
       <SidebarItem section="recents" icon={RecentsIcon} label="Recents" />
       <SidebarItem section="library" icon={LibraryIcon} label="Library" />
       <SidebarItem section="artists" icon={ArtistsIcon} label="Artists" />
