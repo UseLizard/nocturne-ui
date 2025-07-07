@@ -3,6 +3,7 @@ import Sidebar from "../components/common/navigation/Sidebar";
 import HorizontalScroll from "../components/common/navigation/HorizontalScroll";
 import Settings from "../components/settings/Settings";
 import LocalMediaPlayer from "../components/media/LocalMediaPlayer";
+import BluetoothMain from "../components/bluetooth/BluetoothMain";
 import { useGradientState } from "../hooks/useGradientState";
 import { useNavigation } from "../hooks/useNavigation";
 import { useSpotifyPlayerControls } from "../hooks/useSpotifyPlayerControls";
@@ -68,6 +69,8 @@ export default function Home({
       updateGradientColors(null, "settings");
     } else if (activeSection === "media") {
       updateGradientColors(null, "media");
+    } else if (activeSection === "bluetooth") {
+      updateGradientColors(null, "bluetooth");
     }
   }, [
     activeSection,
@@ -85,7 +88,7 @@ export default function Home({
       if (e.key === "Escape") {
         if (activeSection === "recents") {
           setActiveSection("nowPlaying");
-        } else if (activeSection !== "nowPlaying" && activeSection !== "settings") {
+        } else if (activeSection !== "nowPlaying" && activeSection !== "settings" && activeSection !== "bluetooth") {
           setActiveSection("recents");
         }
       }
@@ -773,6 +776,8 @@ export default function Home({
             setActiveSection={setActiveSection}
           />
         );
+      case "bluetooth":
+        return <BluetoothMain setActiveSection={setActiveSection} />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-white/50 text-2xl">
@@ -782,8 +787,8 @@ export default function Home({
     }
   };
 
-  // Render media section as full-screen like NowPlaying
-  if (activeSection === "media") {
+  // Render media and bluetooth sections as full-screen like NowPlaying
+  if (activeSection === "media" || activeSection === "bluetooth") {
     return (
       <div className="relative min-h-screen">
         {renderContent()}

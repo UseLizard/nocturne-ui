@@ -16,11 +16,9 @@ import {
   SettingsGeneralIcon,
   SettingsPlaybackIcon,
   SettingsSupportIcon,
-  BluetoothIcon,
 } from "../common/icons";
 import AccountInfo from "./AccountInfo";
 import SoftwareUpdate from "./SoftwareUpdate";
-import BluetoothSettings from "../bluetooth/BluetoothSettings";
 import { useSettings } from "../../contexts/SettingsContext";
 
 const settingsStructure = {
@@ -71,17 +69,6 @@ const settingsStructure = {
         id: "software-update",
         type: "custom",
         component: SoftwareUpdate,
-      },
-    ],
-  },
-  bluetooth: {
-    title: "Bluetooth",
-    icon: BluetoothIcon,
-    items: [
-      {
-        id: "bluetooth-settings",
-        type: "custom",
-        component: BluetoothSettings,
       },
     ],
   },

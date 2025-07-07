@@ -73,7 +73,7 @@ const DeviceList = ({
   if (devices.length === 0) {
     return (
       <div className={`text-center py-8 ${className}`}>
-        <div className="text-white/40 text-sm">No devices found</div>
+        <div className="text-white/40 text-[30px] font-[560] tracking-tight">No devices found</div>
       </div>
     );
   }
@@ -89,7 +89,7 @@ const DeviceList = ({
         return (
           <div
             key={device.address}
-            className={`p-4 rounded-lg border transition-all ${
+            className={`p-6 rounded-xl border transition-all ${
               device.connected 
                 ? 'bg-green-500/10 border-green-500/30' 
                 : 'bg-white/5 border-white/10 hover:border-white/20'
@@ -99,40 +99,40 @@ const DeviceList = ({
               {/* Device Info */}
               <div className="flex items-center space-x-3 flex-1 min-w-0">
                 <div className="relative">
-                  <DeviceIcon className={`w-8 h-8 ${
+                  <DeviceIcon className={`w-10 h-10 ${
                     device.connected ? 'text-green-400' : 'text-white/60'
                   }`} />
                   {device.connected && (
-                    <CheckCircleIcon className="w-4 h-4 text-green-400 absolute -bottom-1 -right-1" />
+                    <CheckCircleIcon className="w-5 h-5 text-green-400 absolute -bottom-1 -right-1" />
                   )}
                   {isNocturneCompanion && (
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full animate-pulse" />
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 rounded-full animate-pulse" />
                   )}
                 </div>
                 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-2">
-                    <h4 className="font-medium text-white truncate">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <h4 className="text-[32px] font-[580] text-white truncate tracking-tight">
                       {device.alias || device.name || 'Unknown Device'}
                     </h4>
                     {isNocturneCompanion && (
-                      <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded">
+                      <span className="px-3 py-1 bg-blue-500/20 text-blue-400 text-[24px] font-[560] rounded-lg">
                         Media
                       </span>
                     )}
                   </div>
-                  <p className="text-white/60 text-sm">
+                  <p className="text-white/60 text-[28px] font-[560] tracking-tight">
                     {formatDeviceClass(device.class)}
                   </p>
-                  <p className="text-white/40 text-xs font-mono">
+                  <p className="text-white/40 text-[24px] font-[560] font-mono tracking-tight">
                     {device.address}
                   </p>
                   
                   {/* Battery Level */}
                   {device.batteryPercentage !== undefined && device.batteryPercentage > 0 && (
-                    <div className="flex items-center space-x-1 mt-1">
-                      <BatteryIcon className="w-3 h-3 text-white/40" />
-                      <span className="text-white/40 text-xs">
+                    <div className="flex items-center space-x-2 mt-2">
+                      <BatteryIcon className="w-4 h-4 text-white/40" />
+                      <span className="text-white/40 text-[24px] font-[560] tracking-tight">
                         {device.batteryPercentage}%
                       </span>
                     </div>
@@ -141,12 +141,12 @@ const DeviceList = ({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex items-center space-x-2 ml-4">
+              <div className="flex items-center space-x-3 ml-4">
                 {device.connected ? (
                   <button
                     onClick={() => handleAction(onDisconnect, device.address)}
                     disabled={loading || isLoading}
-                    className="px-3 py-1 bg-red-500/20 text-red-400 rounded text-sm hover:bg-red-500/30 transition-colors disabled:opacity-50"
+                    className="px-4 py-2 bg-red-500/20 text-red-400 rounded-xl text-[28px] font-[580] tracking-tight hover:bg-red-500/30 transition-colors disabled:opacity-50 border border-red-500/30"
                   >
                     {isLoading === onDisconnect ? 'Disconnecting...' : 'Disconnect'}
                   </button>
@@ -154,7 +154,7 @@ const DeviceList = ({
                   <button
                     onClick={() => handleAction(onConnect, device.address)}
                     disabled={loading || isLoading}
-                    className="px-3 py-1 bg-blue-500/20 text-blue-400 rounded text-sm hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-xl text-[28px] font-[580] tracking-tight hover:bg-blue-500/30 transition-colors disabled:opacity-50 border border-blue-500/30"
                   >
                     {isLoading === onConnect ? 'Connecting...' : 'Connect'}
                   </button>
@@ -163,24 +163,24 @@ const DeviceList = ({
                 <button
                   onClick={() => handleAction(onForget, device.address)}
                   disabled={loading || isLoading}
-                  className="p-1 text-white/40 hover:text-red-400 hover:bg-red-500/20 rounded transition-colors disabled:opacity-50"
+                  className="p-2 text-white/40 hover:text-red-400 hover:bg-red-500/20 rounded-xl transition-colors disabled:opacity-50"
                   aria-label="Forget device"
                   title="Forget device"
                 >
-                  <XIcon className="w-4 h-4" />
+                  <XIcon className="w-5 h-5" />
                 </button>
               </div>
             </div>
 
             {/* Device Status */}
-            <div className="mt-2 flex items-center space-x-4 text-xs">
-              <span className={`flex items-center space-x-1 ${
+            <div className="mt-4 flex items-center space-x-6 text-[26px] font-[560] tracking-tight">
+              <span className={`flex items-center space-x-2 ${
                 device.connected ? 'text-green-400' : 'text-white/40'
               }`}>
                 {device.connected ? (
-                  <CheckCircleIcon className="w-3 h-3" />
+                  <CheckCircleIcon className="w-4 h-4" />
                 ) : (
-                  <CircleOffIcon className="w-3 h-3" />
+                  <CircleOffIcon className="w-4 h-4" />
                 )}
                 <span>{device.connected ? 'Connected' : 'Not Connected'}</span>
               </span>
