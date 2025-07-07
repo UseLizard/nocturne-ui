@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 
 const ProgressBar = ({
   progress,
@@ -14,11 +14,13 @@ const ProgressBar = ({
   const wasPlayingRef = useRef(false);
   const containerRef = useRef(null);
 
-  const handleClick = () => {
-    setIsScrubbing(true);
-    onScrubbingChange(true);
-    wasPlayingRef.current = isPlaying;
-  };
+  const handleClick = useCallback(() => {
+    if (!isScrubbing) {
+      setIsScrubbing(true);
+      onScrubbingChange(true);
+      wasPlayingRef.current = isPlaying;
+    }
+  }, [isScrubbing, isPlaying, onScrubbingChange]);
 
   useEffect(() => {
     if (!isScrubbing) return;
@@ -40,47 +42,38 @@ const ProgressBar = ({
     return () => window.removeEventListener("wheel", handleWheel);
   }, [isScrubbing, progress]);
 
+  const handleInteractionEnd = useCallback(() => {
+    setIsScrubbing(false);
+    onScrubbingChange(false);
+
+    if (scrubbingProgress !== null) {
+      const seekMs = Math.floor((scrubbingProgress / 100) * durationMs);
+      onSeek(seekMs);
+      updateProgress?.(seekMs);
+    }
+
+    setScrubbingProgress(null);
+  }, [scrubbingProgress, durationMs, onSeek, onScrubbingChange, updateProgress]);
+
   useEffect(() => {
     const handleKeyDown = (event) => {
       if (event.key === "Enter" && isScrubbing) {
         event.preventDefault();
         event.stopPropagation();
-        event.stopImmediatePropagation();
-
-        setIsScrubbing(false);
-        onScrubbingChange(false);
-
-        if (scrubbingProgress !== null) {
-          const seekMs = Math.floor((scrubbingProgress / 100) * durationMs);
-          onSeek(seekMs);
-          updateProgress?.(seekMs);
-        }
-
-        setScrubbingProgress(null);
-        return false;
+        handleInteractionEnd();
       } else if (event.key === "Escape" && isScrubbing) {
         event.preventDefault();
         event.stopPropagation();
-        event.stopImmediatePropagation();
         setIsScrubbing(false);
         onScrubbingChange(false);
         setScrubbingProgress(null);
-        return false;
       }
     };
 
     window.addEventListener("keydown", handleKeyDown, { capture: true });
     return () =>
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [
-    isScrubbing,
-    scrubbingProgress,
-    durationMs,
-    onSeek,
-    onPlayPause,
-    onScrubbingChange,
-    updateProgress,
-  ]);
+  }, [isScrubbing, handleInteractionEnd, onScrubbingChange]);
 
   const finalProgress = scrubbingProgress ?? progress;
   const shouldShowTimestampOutside = finalProgress < 8;

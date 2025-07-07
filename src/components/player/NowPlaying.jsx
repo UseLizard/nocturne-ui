@@ -51,12 +51,13 @@ export default function NowPlaying({
   const [shuffleEnabled, setShuffleEnabled] = useState(false);
   const [repeatMode, setRepeatMode] = useState("off");
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [localVolume, setLocalVolume] = useState(null);
   
   const volumeTimerRef = useRef(null);
   const volumeLastAdjustedRef = useRef(0);
   const containerRef = useRef(null);
   const currentTrackIdRef = useRef(null);
-  const prevVolumeRef = useRef(null);
+  const isSeekingRef = useRef(false);
   
   const isDJPlaylist =
     currentPlayback?.context?.uri === "spotify:playlist:37i9dQZF1EYkqdzj48dyYq";
@@ -75,7 +76,7 @@ export default function NowPlaying({
     unlikeTrack,
     sendDJSignal,
     setVolume,
-    volume,
+    volume: spotifyVolume,
     updateVolumeFromDevice,
     toggleShuffle,
     setRepeatMode: setRepeatModeApi,
@@ -91,6 +92,30 @@ export default function NowPlaying({
     updateProgress,
     triggerRefresh
   } = playbackProgress;
+
+  const volume = localVolume ?? spotifyVolume;
+
+  const debouncedSetVolume = useCallback(
+    debounce((newVolume) => {
+      setVolume(newVolume);
+    }, 250),
+    [setVolume]
+  );
+
+  const handleVolumeChange = useCallback((newVolume) => {
+    setLocalVolume(newVolume);
+    showVolumeOverlay();
+    debouncedSetVolume(newVolume);
+  }, [showVolumeOverlay, debouncedSetVolume]);
+
+  useEffect(() => {
+    if (localVolume !== null) {
+      const timer = setTimeout(() => {
+        setLocalVolume(null);
+      }, 1000); // Reset local volume after 1s of inactivity
+      return () => clearTimeout(timer);
+    }
+  }, [localVolume]);
 
   const convertTimeToLength = (ms, elapsed) => {
     let totalSeconds = Math.floor(ms / 1000);
@@ -113,9 +138,6 @@ export default function NowPlaying({
   
   useEffect(() => {
     if (currentPlayback?.device?.volume_percent !== undefined) {
-      if (prevVolumeRef.current === null) {
-        prevVolumeRef.current = currentPlayback.device.volume_percent;
-      }
       updateVolumeFromDevice(currentPlayback.device.volume_percent);
     }
   }, [currentPlayback?.device?.volume_percent, updateVolumeFromDevice]);
@@ -156,27 +178,12 @@ export default function NowPlaying({
   }, []);
   
   // Unified scroll wheel for volume control (Spotify mode)
-  const { manualVolumeChangeRef } = useMediaScrollWheel({
+  useMediaScrollWheel({
     containerRef,
-    onVolumeChange: setVolume,
+    onVolumeChange: handleVolumeChange,
     currentVolume: volume,
-    showVolumeOverlay,
     enabled: !isProgressScrubbing,
   });
-  
-  useEffect(() => {
-    if (prevVolumeRef.current === null) {
-      prevVolumeRef.current = volume;
-      return;
-    }
-    
-    if (prevVolumeRef.current !== volume && manualVolumeChangeRef.current) {
-      showVolumeOverlay();
-      manualVolumeChangeRef.current = false;
-    }
-    
-    prevVolumeRef.current = volume;
-  }, [volume, showVolumeOverlay, manualVolumeChangeRef]);
 
   useEffect(() => {
     if (currentPlayback?.shuffle_state !== undefined) {

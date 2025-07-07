@@ -11,4 +11,15 @@ export default defineConfig({
       modernPolyfills: true,
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['react', 'react-dom'],
+          'spotify': ['./src/hooks/useSpotifyData.js', './src/hooks/useSpotifyPlayerControls.js'],
+          'ui': ['./src/components/common/navigation/Sidebar.jsx', './src/components/common/navigation/HorizontalScroll.jsx'],
+        },
+      },
+    },
+  },
 });

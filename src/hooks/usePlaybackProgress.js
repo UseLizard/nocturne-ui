@@ -11,10 +11,10 @@ export const usePlaybackProgress = (currentPlayback, refreshPlaybackState, acces
   const [duration, setDuration] = useState(0);
   const [trackId, setTrackId] = useState(null);
 
-  const lastUpdateTimeRef = useRef(Date.now());
   const animationFrameRef = useRef(null);
-  const serverProgressRef = useRef(0);
-  const frameSkipCounterRef = useRef(0);
+  const lastServerProgressRef = useRef(0);
+  const lastClientTimeRef = useRef(Date.now());
+  const isSeekingRef = useRef(false);
 
   const scheduleNextRefresh = useCallback(() => {
     const REFRESH_INTERVAL = 15000;
@@ -53,55 +53,61 @@ export const usePlaybackProgress = (currentPlayback, refreshPlaybackState, acces
 
   useEffect(() => {
     if (currentPlayback) {
-      if (currentPlayback?.item?.id !== trackId) {
-        setTrackId(currentPlayback.item?.id);
-        setDuration(currentPlayback.item?.duration_ms || 0);
-        serverProgressRef.current = currentPlayback.progress_ms || 0;
-        setProgressMs(currentPlayback.progress_ms || 0);
-        lastUpdateTimeRef.current = Date.now();
+      const currentTrackId = currentPlayback.item?.id || null;
+      const currentDuration = currentPlayback.item?.duration_ms || 0;
+      const serverProgress = currentPlayback.progress_ms || 0;
+
+      if (trackId !== currentTrackId) {
+        setTrackId(currentTrackId);
+        setDuration(currentDuration);
+        setProgressMs(serverProgress);
+        lastServerProgressRef.current = serverProgress;
+        lastClientTimeRef.current = Date.now();
       }
-      else if (currentPlayback?.progress_ms !== undefined) {
-        serverProgressRef.current = currentPlayback.progress_ms;
-        setProgressMs(currentPlayback.progress_ms);
-        lastUpdateTimeRef.current = Date.now();
+
+      if (!isSeekingRef.current) {
+        lastServerProgressRef.current = serverProgress;
+        lastClientTimeRef.current = Date.now();
+        if (!currentPlayback.is_playing) {
+          setProgressMs(serverProgress);
+        }
       }
 
       setIsPlaying(currentPlayback.is_playing || false);
-      setDuration(currentPlayback.item?.duration_ms || 0);
+      setDuration(currentDuration);
     }
   }, [currentPlayback, trackId]);
 
   useEffect(() => {
-    if (animationFrameRef.current) {
+    if (isPlaying) {
+      const animate = () => {
+        const now = Date.now();
+        const elapsed = now - lastClientTimeRef.current;
+        const newProgress = lastServerProgressRef.current + elapsed;
+        
+        if (!isSeekingRef.current) {
+          setProgressMs(Math.min(newProgress, duration));
+        }
+        animationFrameRef.current = requestAnimationFrame(animate);
+      };
+      animationFrameRef.current = requestAnimationFrame(animate);
+    } else {
       cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
     }
 
-    if (!isPlaying || duration <= 0) return;
-
-    const animate = () => {
-      const now = Date.now();
-      const elapsed = now - lastUpdateTimeRef.current;
-      const estimated = Math.min(serverProgressRef.current + elapsed, duration);
-      setProgressMs(estimated);
-
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    animationFrameRef.current = requestAnimationFrame(animate);
-
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-        animationFrameRef.current = null;
-      }
-    };
+    return () => cancelAnimationFrame(animationFrameRef.current);
   }, [isPlaying, duration]);
 
   const updateProgress = useCallback((newProgressMs) => {
-    serverProgressRef.current = newProgressMs;
+    isSeekingRef.current = true;
     setProgressMs(newProgressMs);
-    lastUpdateTimeRef.current = Date.now();
+    
+    // After seeking, allow a moment before resuming server updates
+    setTimeout(() => {
+      isSeekingRef.current = false;
+      lastServerProgressRef.current = newProgressMs;
+      lastClientTimeRef.current = Date.now();
+    }, 500);
   }, []);
 
   return {
