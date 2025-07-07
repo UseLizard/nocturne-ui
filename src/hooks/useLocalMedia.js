@@ -1,188 +1,194 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNocturned } from './useNocturned';
 
+/*
+ * CRITICAL: Volume Control Position Sync Issue Prevention
+ * 
+ * Problem: When scrolling to change volume, the progress bar and time display would jump 
+ * back/forward to the position from when volume was last changed, causing jarring UX.
+ * 
+ * Root Cause: WebSocket messages from server include volume updates that were incorrectly 
+ * treated as full media state updates, causing lastClientUpdateRef.current to reset and 
+ * breaking the smooth position animation calculation.
+ * 
+ * Solution Logic:
+ * 1. SEPARATE volume changes from position changes - they are independent operations
+ * 2. DETECT volume-only updates by comparing position_ms, is_playing, and track fields
+ * 3. SKIP timestamp updates (lastClientUpdateRef) for volume-only server responses
+ * 4. MAINTAIN smooth position animation by only updating timestamp for actual media changes
+ * 5. KEEP volume sync independent via clientVolume state and reset timer
+ * 
+ * Why This Works:
+ * - Position animation depends on elapsed time since last known server position
+ * - Volume changes shouldn't affect position calculation timing
+ * - Server sends separate updates for volume vs media state, we must handle them differently
+ * - Client-side volume state overrides server volume temporarily for smooth UX
+ */
+
+// Debounce utility to prevent spamming the server with requests
+const debounce = (func, delay) => {
+  let timeout;
+  return (...args) => {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), delay);
+  };
+};
+
 export const useLocalMedia = () => {
   const { wsConnected, apiRequest, addMessageListener, removeMessageListener } = useNocturned();
-  
+
   const [isConnected, setIsConnected] = useState(false);
   const [mediaState, setMediaState] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const listenerIdRef = useRef(null);
 
-  // Check media connection status
-  const checkMediaStatus = useCallback(async () => {
-    try {
-      const status = await apiRequest('/media/status');
-      setIsConnected(status.connected);
-      if (status.state) {
-        setMediaState(status.state);
-      }
-      return status;
-    } catch (err) {
-      console.error('Error checking media status:', err);
-      setError(err.message);
-      return null;
-    }
-  }, [apiRequest]);
+  // --- State for smooth, client-side UI updates ---
+  const [clientPosition, setClientPosition] = useState(0);
+  const [clientVolume, setClientVolume] = useState(null); // Use null to indicate no override
 
-  // Send media commands
+  const animationFrameRef = useRef(null);
+  const lastServerStateRef = useRef(null);
+  const lastClientUpdateRef = useRef(Date.now());
+  const isSeekingRef = useRef(false);
+
+  const isPlaying = mediaState?.is_playing || false;
+  const duration = mediaState?.duration_ms || 0;
+  const volume = clientVolume ?? mediaState?.volume_percent ?? 50;
+
+  // --- Server Communication ---
   const sendCommand = useCallback(async (command, params = {}) => {
+    setLoading(true);
     try {
-      setLoading(true);
-      setError(null);
-      
       let endpoint = `/media/${command}`;
-      
-      // Handle parameterized commands
       if (command === 'seek' && params.positionMs !== undefined) {
         endpoint = `/media/seek/${params.positionMs}`;
       } else if (command === 'volume' && params.volumePercent !== undefined) {
         endpoint = `/media/volume/${params.volumePercent}`;
       }
-      
-      const response = await apiRequest(endpoint, 'POST');
-      return response;
+      await apiRequest(endpoint, 'POST');
     } catch (err) {
       console.error(`Error sending ${command} command:`, err);
       setError(err.message);
-      throw err;
     } finally {
       setLoading(false);
     }
   }, [apiRequest]);
 
-  // Media control functions
-  const play = useCallback(() => sendCommand('play'), [sendCommand]);
-  const pause = useCallback(() => sendCommand('pause'), [sendCommand]);
+  const debouncedVolumeCommand = useCallback(debounce((vol) => sendCommand('volume', { volumePercent: vol }), 250), [sendCommand]);
+
+  // --- UI Actions ---
+  const togglePlayPause = useCallback(() => sendCommand(isPlaying ? 'pause' : 'play'), [sendCommand, isPlaying]);
   const next = useCallback(() => sendCommand('next'), [sendCommand]);
   const previous = useCallback(() => sendCommand('previous'), [sendCommand]);
-  const seekTo = useCallback((positionMs) => 
-    sendCommand('seek', { positionMs }), [sendCommand]);
-  const setVolume = useCallback(async (volumePercent) => {
-    // Immediately update local state to prevent stale values
-    setMediaState(prev => prev ? { ...prev, volume_percent: volumePercent } : null);
-    
-    return await sendCommand('volume', { volumePercent });
+
+  const seekTo = useCallback((positionMs) => {
+    isSeekingRef.current = true;
+    setClientPosition(positionMs);
+    lastClientUpdateRef.current = Date.now();
+    lastServerStateRef.current = { ...lastServerStateRef.current, position_ms: positionMs };
+    sendCommand('seek', { positionMs });
+    setTimeout(() => { isSeekingRef.current = false; }, 500); // Reset seeking flag after a delay
   }, [sendCommand]);
 
-  // Toggle play/pause
-  const togglePlayPause = useCallback(() => {
-    if (mediaState?.is_playing) {
-      return pause();
-    } else {
-      return play();
-    }
-  }, [mediaState?.is_playing, play, pause]);
+  const setVolume = useCallback((newVolume) => {
+    setClientVolume(newVolume);
+    debouncedVolumeCommand(newVolume);
+    // Don't update lastClientUpdateRef when changing volume to avoid position jumps
+  }, [debouncedVolumeCommand]);
 
-  // Simulate media state for testing
-  const simulateState = useCallback(async (artist, track, isPlaying) => {
-    try {
-      await apiRequest('/media/simulate', 'POST', {
-        artist,
-        track,
-        is_playing: isPlaying
-      });
-    } catch (err) {
-      console.error('Error simulating media state:', err);
-      setError(err.message);
-    }
-  }, [apiRequest]);
-
-  // Handle WebSocket messages
+  // --- WebSocket Message Handler ---
   const handleWsMessage = useCallback((data) => {
-    switch (data.type) {
-      case 'media/connected':
-        setIsConnected(true);
-        setError(null);
-        checkMediaStatus();
-        break;
-        
-      case 'media/disconnected':
-        setIsConnected(false);
-        setMediaState(null);
-        break;
-        
-      case 'media/state_update':
-        setMediaState(data.payload);
-        setIsConnected(true);
-        setError(null);
-        break;
-        
-      case 'media/command_sent':
-        // Command acknowledged, could show visual feedback
-        setError(null);
-        break;
-        
-      default:
-        break;
-    }
-  }, [checkMediaStatus]);
+    if (data.type === 'media/connected') {
+      setIsConnected(true);
+    } else if (data.type === 'media/disconnected') {
+      setIsConnected(false);
+      setMediaState(null);
+    } else if (data.type === 'media/state_update') {
+      const serverState = data.payload;
+      const isTrackChange = lastServerStateRef.current?.track !== serverState.track;
+      const isVolumeOnlyUpdate = lastServerStateRef.current && 
+        lastServerStateRef.current.position_ms === serverState.position_ms &&
+        lastServerStateRef.current.is_playing === serverState.is_playing &&
+        lastServerStateRef.current.track === serverState.track;
 
-  // Initialize WebSocket listener and check initial status
+      lastServerStateRef.current = serverState;
+      
+      // Only update the client timestamp if this isn't a volume-only update
+      if (!isVolumeOnlyUpdate) {
+        lastClientUpdateRef.current = Date.now();
+      }
+      
+      setMediaState(serverState);
+
+      // If the track changed or we aren't seeking, sync the position.
+      if (isTrackChange || !isSeekingRef.current) {
+        setClientPosition(serverState.position_ms || 0);
+      }
+
+      // Volume sync is handled by the clientVolume reset timer
+    }
+  }, []);
+
+  // --- Effects for Initialization and Animation ---
   useEffect(() => {
     const listenerId = addMessageListener('local-media', handleWsMessage);
-    listenerIdRef.current = listenerId;
-
-    // Check initial status
-    checkMediaStatus();
-
-    return () => {
-      if (listenerIdRef.current) {
-        removeMessageListener(listenerIdRef.current);
+    // Initial status check
+    apiRequest('/media/status').then(status => {
+      if (status) {
+        setIsConnected(status.connected);
+        if (status.state) {
+          setMediaState(status.state);
+          setClientPosition(status.state.position_ms || 0);
+          lastServerStateRef.current = status.state;
+          lastClientUpdateRef.current = Date.now();
+        }
       }
-    };
-  }, [addMessageListener, removeMessageListener, handleWsMessage, checkMediaStatus]);
+    });
+    return () => removeMessageListener(listenerId);
+  }, [apiRequest, addMessageListener, removeMessageListener, handleWsMessage]);
 
-  // Format duration and position
-  const formatTime = useCallback((milliseconds) => {
-    if (!milliseconds || milliseconds < 0) return '0:00';
-    
-    const totalSeconds = Math.floor(milliseconds / 1000);
+  useEffect(() => {
+    if (isPlaying) {
+      const animate = () => {
+        if (!isSeekingRef.current) {
+          const elapsed = Date.now() - lastClientUpdateRef.current;
+          const newPosition = (lastServerStateRef.current?.position_ms || 0) + elapsed;
+          setClientPosition(Math.min(newPosition, duration));
+        }
+        animationFrameRef.current = requestAnimationFrame(animate);
+      };
+      animationFrameRef.current = requestAnimationFrame(animate);
+    } else {
+      cancelAnimationFrame(animationFrameRef.current);
+    }
+    return () => cancelAnimationFrame(animationFrameRef.current);
+  }, [isPlaying, duration]);
+
+  // Reset local volume override after a period of inactivity
+  useEffect(() => {
+    if (clientVolume !== null) {
+      const timer = setTimeout(() => setClientVolume(null), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [clientVolume]);
+
+  const formatTime = useCallback((ms) => {
+    if (!ms || ms < 0) return '0:00';
+    const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }, []);
 
-  // Calculate progress percentage
-  const getProgress = useCallback(() => {
-    if (!mediaState?.duration_ms || !mediaState?.position_ms) return 0;
-    return Math.min(100, (mediaState.position_ms / mediaState.duration_ms) * 100);
-  }, [mediaState?.duration_ms, mediaState?.position_ms]);
-
   return {
-    // Connection state
-    isConnected,
-    wsConnected,
-    loading,
-    error,
-    
-    // Media state
-    mediaState,
+    isConnected, wsConnected, loading, error,
     currentTrack: mediaState?.track,
     currentArtist: mediaState?.artist,
     currentAlbum: mediaState?.album,
-    isPlaying: mediaState?.is_playing || false,
-    duration: mediaState?.duration_ms,
-    position: mediaState?.position_ms,
-    volume: mediaState?.volume_percent ?? 50,
-    
-    // Control functions
-    play,
-    pause,
-    next,
-    previous,
-    seekTo,
-    setVolume,
-    togglePlayPause,
-    
-    // Utility functions
+    isPlaying, duration,
+    position: clientPosition,
+    volume,
+    togglePlayPause, next, previous, seekTo, setVolume,
     formatTime,
-    getProgress,
-    checkMediaStatus,
-    simulateState,
-    
-    // Raw command interface
-    sendCommand
   };
 };

@@ -6,7 +6,6 @@ import {
   RadioIcon,
   PodcastIcon,
   SettingsIcon,
-  SmartphoneIcon,
   BluetoothIcon,
 } from "../../common/icons";
 import StatusBar from "./StatusBar";
@@ -47,12 +46,7 @@ export default function Sidebar({ activeSection, setActiveSection }) {
     <div className="space-y-7 pt-12">
       {settings.showStatusBar && <StatusBar />}
 
-      <SidebarItem
-        section="nowPlaying"
-        icon={NowPlayingIcon}
-        label="Now Playing"
-      />
-      <SidebarItem section="media" icon={SmartphoneIcon} label="Media" />
+      <SidebarItem section="media" icon={NowPlayingIcon} label="Media" />
       <SidebarItem section="recents" icon={RecentsIcon} label="Recents" />
       <SidebarItem section="library" icon={LibraryIcon} label="Library" />
       <SidebarItem section="artists" icon={ArtistsIcon} label="Artists" />
