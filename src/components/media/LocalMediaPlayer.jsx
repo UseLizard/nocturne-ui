@@ -404,16 +404,22 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
               pixelsPerSecond={40}
             />
           </div>
-          <h4 className="text-[36px] font-[560] text-white/60 truncate tracking-tight max-w-[380px]">
-            {mediaMode === 'podcast' && currentTrack ? (
+          <h4 className="text-[36px] font-[560] text-white/60 tracking-tight max-w-[380px]">
+            {/* This block will only render when mediaMode is 'song' and a track is playing */}
+            {mediaMode === 'song' && currentTrack && (
               <>
-                <div>Episode: {currentAlbum || 'Unknown Episode'}</div>
-                <div className="text-[28px] font-[500] text-white/50 mt-1">
-                  Podcast: {currentArtist || 'Unknown Podcast'}
+                <div className="truncate">{currentAlbum || 'Unknown Album'}</div>
+                <div className="text-[28px] font-[500] text-white/50 mt-1 truncate">
+                  {currentArtist || 'Unknown Artist'}
                 </div>
               </>
-            ) : (
-              currentArtist || (isConnected ? "Start playing music on your Android device" : "Pair your Android device")
+            )}
+            
+            {/* This block will render for 'podcast' mode OR if no track is playing */}
+            {(mediaMode === 'podcast' || !currentTrack) && (
+              <div className="text-[28px] font-[500] text-white/50 mt-1 truncate">
+                {currentArtist || (isConnected ? "Start playing music on your Android device" : "Pair your Android device")}
+              </div>
             )}
           </h4>
           
