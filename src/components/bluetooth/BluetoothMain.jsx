@@ -3,7 +3,9 @@ import { useBluetooth } from '../../hooks/useNocturned';
 import DeviceList from './DeviceList';
 import PairingModal from './PairingModal';
 import BluetoothStatus from './BluetoothStatus';
-import { BluetoothIcon, RefreshIcon } from '../common/icons';
+import BluetoothProfiles from './BluetoothProfiles';
+import BLEConnectionLog from './BLEConnectionLog';
+import { BluetoothIcon, RefreshIcon, SettingsIcon } from '../common/icons';
 
 const BluetoothMain = ({ setActiveSection }) => {
   const {
@@ -24,6 +26,8 @@ const BluetoothMain = ({ setActiveSection }) => {
 
   const [isDiscoverable, setIsDiscoverable] = useState(false);
   const [discoveryTimeout, setDiscoveryTimeout] = useState(null);
+  const [selectedDevice, setSelectedDevice] = useState(null);
+  const [showProfiles, setShowProfiles] = useState(false);
 
   // Fetch devices on mount
   useEffect(() => {
@@ -101,6 +105,7 @@ const BluetoothMain = ({ setActiveSection }) => {
 
   const connectedDevices = devices.filter(device => device.connected);
   const pairedDevices = devices.filter(device => device.paired && !device.connected);
+  const allPairedDevices = devices.filter(device => device.paired); // For profile management
 
   return (
     <div className="h-full overflow-y-auto overflow-x-hidden" style={{ touchAction: "pan-y", overflowX: "hidden" }}>
@@ -183,15 +188,30 @@ const BluetoothMain = ({ setActiveSection }) => {
           {/* Connected Devices */}
           {connectedDevices.length > 0 && (
             <div className="mb-8">
-              <h3 className="text-[36px] font-[580] text-white tracking-tight mb-6">
-                Connected Devices
-              </h3>
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-[36px] font-[580] text-white tracking-tight">
+                  Connected Devices
+                </h3>
+                {!showProfiles && (
+                  <button
+                    onClick={() => setShowProfiles(true)}
+                    className="px-6 py-3 bg-blue-500/20 text-blue-300 rounded-xl hover:bg-blue-500/30 transition-colors text-[32px] font-[580] tracking-tight border border-blue-500/30 flex items-center space-x-3"
+                  >
+                    <SettingsIcon className="w-6 h-6" />
+                    <span>Manage Profiles</span>
+                  </button>
+                )}
+              </div>
               <div className="space-y-4">
                 <DeviceList
                   devices={connectedDevices}
                   onConnect={handleConnect}
                   onDisconnect={handleDisconnect}
                   onForget={handleForget}
+                  onManageProfiles={(device) => {
+                    setSelectedDevice(device);
+                    setShowProfiles(true);
+                  }}
                   loading={loading}
                 />
               </div>
@@ -200,9 +220,20 @@ const BluetoothMain = ({ setActiveSection }) => {
 
           {/* Paired Devices */}
           <div className="mb-8">
-            <h3 className="text-[36px] font-[580] text-white tracking-tight mb-6">
-              Paired Devices {pairedDevices.length > 0 && `(${pairedDevices.length})`}
-            </h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-[36px] font-[580] text-white tracking-tight">
+                Paired Devices {pairedDevices.length > 0 && `(${pairedDevices.length})`}
+              </h3>
+              {!showProfiles && allPairedDevices.length > 0 && connectedDevices.length === 0 && (
+                <button
+                  onClick={() => setShowProfiles(true)}
+                  className="px-6 py-3 bg-blue-500/20 text-blue-300 rounded-xl hover:bg-blue-500/30 transition-colors text-[32px] font-[580] tracking-tight border border-blue-500/30 flex items-center space-x-3"
+                >
+                  <SettingsIcon className="w-6 h-6" />
+                  <span>Manage Profiles</span>
+                </button>
+              )}
+            </div>
             {pairedDevices.length > 0 ? (
               <div className="space-y-4">
                 <DeviceList
@@ -210,6 +241,10 @@ const BluetoothMain = ({ setActiveSection }) => {
                   onConnect={handleConnect}
                   onDisconnect={handleDisconnect}
                   onForget={handleForget}
+                  onManageProfiles={(device) => {
+                    setSelectedDevice(device);
+                    setShowProfiles(true);
+                  }}
                   loading={loading}
                 />
               </div>
@@ -224,6 +259,91 @@ const BluetoothMain = ({ setActiveSection }) => {
               </div>
             )}
           </div>
+
+          {/* BLE Connection Log */}
+          <div className="mb-8">
+            <BLEConnectionLog />
+          </div>
+
+          {/* Profile Management Section */}
+          {showProfiles && (
+            <div className="mb-8">
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-[36px] font-[580] text-white tracking-tight">
+                  Bluetooth Profile Management
+                </h3>
+                <button
+                  onClick={() => {
+                    setShowProfiles(false);
+                    setSelectedDevice(null);
+                  }}
+                  className="px-6 py-3 bg-white/10 text-white/60 rounded-xl hover:bg-white/20 transition-colors text-[32px] font-[580] tracking-tight border border-white/20"
+                >
+                  Close Profiles
+                </button>
+              </div>
+
+              {/* Device Selector */}
+              {!selectedDevice && allPairedDevices.length > 0 && (
+                <div className="mb-8">
+                  <h4 className="text-[32px] font-[580] text-white tracking-tight mb-4">
+                    Select Device to Manage
+                  </h4>
+                  <div className="grid grid-cols-1 gap-4">
+                    {allPairedDevices.map(device => (
+                      <button
+                        key={device.address}
+                        onClick={() => setSelectedDevice(device)}
+                        className="p-6 bg-white/10 rounded-xl border border-white/20 hover:bg-white/20 transition-colors text-left"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <div className="text-[34px] font-[580] text-white tracking-tight">
+                              {device.name || device.alias || 'Unknown Device'}
+                            </div>
+                            <div className="text-[30px] font-[560] text-white/60 tracking-tight">
+                              {device.address}
+                            </div>
+                            <div className="text-[28px] font-[560] text-white/40 tracking-tight">
+                              {device.connected ? 'Connected' : 'Paired but not connected'}
+                            </div>
+                          </div>
+                          <SettingsIcon className="w-8 h-8 text-blue-400" />
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Profile Management Interface */}
+              {selectedDevice && (
+                <div className="bg-white/5 rounded-xl border border-white/10 p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h4 className="text-[34px] font-[580] text-white tracking-tight">
+                        {selectedDevice.name || selectedDevice.alias || 'Unknown Device'}
+                      </h4>
+                      <div className="text-[30px] font-[560] text-white/60 tracking-tight">
+                        {selectedDevice.address}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setSelectedDevice(null)}
+                      className="px-4 py-2 bg-white/10 text-white/60 rounded-xl hover:bg-white/20 transition-colors text-[28px] font-[580] tracking-tight border border-white/20"
+                    >
+                      Change Device
+                    </button>
+                  </div>
+
+                  <BluetoothProfiles
+                    deviceAddress={selectedDevice.address}
+                    deviceName={selectedDevice.name || selectedDevice.alias}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
