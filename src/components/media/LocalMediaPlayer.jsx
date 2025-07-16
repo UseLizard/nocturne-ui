@@ -2,6 +2,7 @@ import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react'
 import { useLocalMedia } from '../../hooks/useLocalMedia';
 import { useNavigation } from '../../hooks/useNavigation';
 import { useMediaScrollWheel } from '../../hooks/useScrollWheel';
+import { useGestureControls } from '../../hooks/useGestureControls';
 import ScrollingText from '../common/ScrollingText';
 import {
   BluetoothIcon,
@@ -142,6 +143,7 @@ const LocalMediaProgressBar = ({
 
 const LocalMediaPlayer = ({ className = "", onClose }) => {
   const containerRef = useRef(null);
+  const contentContainerRef = useRef(null);
   const [volumeOverlayState, setVolumeOverlayState] = useState({
     visible: false,
     animation: "hidden"
@@ -238,6 +240,14 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     onEscape: onClose,
     onEnterKey: handlePlayPause,
     activeSection: "media",
+  });
+
+  // Enable swipe gestures for track navigation
+  useGestureControls({
+    contentRef: contentContainerRef,
+    onSwipeLeft: handleSkipNext,
+    onSwipeRight: handleSkipPrevious,
+    isActive: true,
   });
 
   // Handle Enter key (scroll wheel button press) for play/pause
@@ -344,7 +354,10 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
       ref={containerRef}
     >
       {/* Main Content Area */}
-      <div className="md:w-1/3 flex flex-row items-center px-12 pt-10 flex-1">
+      <div 
+        className="md:w-1/3 flex flex-row items-center px-12 pt-10 flex-1"
+        ref={contentContainerRef}
+      >
         {/* Album Art - Blank Square */}
         <div className="min-w-[280px] mr-8">
           <div
