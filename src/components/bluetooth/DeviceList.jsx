@@ -16,6 +16,7 @@ const DeviceList = ({
   onConnect, 
   onDisconnect, 
   onForget, 
+  onManageProfiles,
   loading = false,
   className = "" 
 }) => {
@@ -157,6 +158,18 @@ const DeviceList = ({
                     className="px-4 py-2 bg-blue-500/20 text-blue-400 rounded-xl text-[28px] font-[580] tracking-tight hover:bg-blue-500/30 transition-colors disabled:opacity-50 border border-blue-500/30"
                   >
                     {isLoading === onConnect ? 'Connecting...' : 'Connect'}
+                  </button>
+                )}
+                
+                {/* Manage Profiles Button */}
+                {onManageProfiles && (
+                  <button
+                    onClick={() => onManageProfiles(device)}
+                    disabled={loading || isLoading}
+                    className="px-4 py-2 bg-purple-500/20 text-purple-400 rounded-xl text-[28px] font-[580] tracking-tight hover:bg-purple-500/30 transition-colors disabled:opacity-50 border border-purple-500/30"
+                    title="Manage Bluetooth Profiles"
+                  >
+                    Profiles
                   </button>
                 )}
                 

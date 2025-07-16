@@ -1,0 +1,28 @@
+[General]
+Name = Nocturne (Q914)
+Class = 0x000100
+DiscoverableTimeout = 0
+PairableTimeout = 0
+AutoConnectTimeout = 60
+EnableGatt = false
+
+[Policy]
+AutoEnable = true
+ReconnectUUIDs = 00001101-0000-1000-8000-00805f9b34fb
+ReconnectAttempts = 7
+ReconnectIntervals = 1,2,4,8,16,32,64
+
+[GATT]
+Cache = no
+KeySize = 16
+ExchangeMTU = 517
+Channels = 1
+
+# Disable all networking profiles
+[BR/EDR]
+SDP = false
+RFCOMM = true
+L2CAP = true
+
+# Explicitly disable problematic services
+DisablePlugins = network,input,hog,gap,scanparam,deviceinfo,battery,heartrate,cyclingspeed,alert,time,proximity,thermometer,health,netstumbler,sap,a2dp,avrcp,hfp,hsp,pbap,map,opp,ftp,dun,panu,nap,gn

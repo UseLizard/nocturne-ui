@@ -1,0 +1,6 @@
+#!/bin/sh
+[ -r ./conf ] && . ./conf
+sv check dbus >/dev/null || exit 1
+exec 2>&1
+# Run with minimal plugins and no networking
+exec /usr/libexec/bluetooth/bluetoothd -n -P network,input,hog,gap,scanparam,deviceinfo,battery,heartrate,cyclingspeed,alert,time,proximity,thermometer,health,netstumbler,sap,a2dp,avrcp,hfp,hsp,pbap,map,opp,ftp,dun,panu,nap,gn

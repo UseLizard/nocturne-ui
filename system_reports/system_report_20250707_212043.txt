@@ -1,0 +1,131 @@
+[0;34m[INFO][0m Performing full system analysis...
+=== NOCTURNE CAR THING SYSTEM MAP ===
+Generated: Thu Jan  1 02:17:31 UTC 2015
+Hostname: nocturne
+========================================
+
+--- system_overview ---
+Kernel: Linux nocturne 4.9.113 #1-NixOS SMP PREEMPT Tue Jan 1 00:00:00 UTC 1980 aarch64 GNU/Linux
+OS: Alpine Linux v3.21
+Uptime:  02:17:31 up  2:17,  0 users,  load average: 2.18, 2.40, 2.57
+CPU: 
+Memory: 233.1M/484.8M (14.5M% used)
+Disk Usage: 1.2G/1.2G (100% used)
+Load Average: 2.18, 2.40, 2.57
+
+--- nocturne_services ---
+Nocturned Service:  * status: started
+Caddy Service:  * status: started
+Weston Service:  * status: started
+Chromium Process: Running
+Active OpenRC Services:
+ modules                                                           [  started  ]
+ hostname                                                          [  started  ]
+ syslog                                                            [  started  ]
+ dbus                                                              [  started  ]
+ bluetooth_adapter                                     [  started 02:17:17 (0) ]
+ bluetooth                                                         [  started  ]
+ data_prepare                                                      [  started  ]
+ networking                                                        [  started  ]
+ network-bridge                                                    [  started  ]
+ networkmanager                                        [  started 02:17:16 (0) ]
+
+--- network_connectivity ---
+Network Interfaces:
+  lo: UNKNOWN
+  tunl0@NONE: DOWN
+  ip_vti0@NONE: DOWN
+  ip6_vti0@NONE: DOWN
+  sit0@NONE: DOWN
+  ip6tnl0@NONE: DOWN
+  usb0: UP
+  br0: UNKNOWN
+Bluetooth Adapter: hci0
+WiFi Status: Not connected
+Listening Ports: 
+
+--- hardware_info ---
+CPU Cores: 4
+CPU Temperature: 43.8°C
+Display Brightness: 105/255
+Storage Devices:
+mmcblk0      179:0    0  3.6G  0 disk 
+├─mmcblk0p1  179:1    0   32M  0 part /uboot
+├─mmcblk0p2  179:2    0  1.3G  0 part 
+├─mmcblk0p3  179:3    0  1.3G  0 part /
+└─mmcblk0p4  179:4    0  990M  0 part /var/lib
+mmcblk0boot0 179:32   0    4M  0 disk 
+mmcblk0boot1 179:64   0    4M  0 disk 
+mmcblk0rpmb  179:96   0    4M  0 disk 
+zram0        254:0    0    0B  0 disk 
+
+--- filesystem_storage ---
+File System Usage:
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root       1.2G  1.2G     0 100% /
+devtmpfs         10M     0   10M   0% /dev
+tmpfs           243M  784K  242M   1% /run
+tmpfs           243M   12M  231M   5% /dev/shm
+/dev/mmcblk0p1   32M  1.8M   31M   6% /uboot
+/dev/mmcblk0p4  957M  274M  617M  31% /data
+tmpfs           243M     0  243M   0% /tmp
+tmpfs           243M  8.0K  243M   1% /run/lock
+
+Nocturne-specific Paths:
+  Binary: ✗ /usr/local/bin/nocturned missing
+  UI Path: ✓ /etc/nocturne/ui
+  Data Path: ✓ /data/etc/nocturne
+  Config Files:
+    /etc/nocturne/ui-backup-20250703-001228/assets/index-BakFTPpS.css
+    /etc/nocturne/ui-backup-20250703-001228/assets/index-CKIm4pfV.js
+    /etc/nocturne/ui-backup-20250703-001228/assets/index-CSG5AhI8.js
+    /etc/nocturne/ui-backup-20250703-001228/assets/index-DSM-Yzxy.css
+    /etc/nocturne/ui-backup-20250703-001228/assets/index-BkrGYxMi.js
+    /etc/nocturne/ui-backup-20250703-001228/assets/index-BG9DHOz9.js
+    /etc/nocturne/ui-backup-20250703-001228/assets/index-ChZO4xKs.js
+    /etc/nocturne/ui-backup-20250703-001228/assets/index-n3Dt_GsF.js
+    /etc/nocturne/ui-backup-20250703-001228/fonts/NotoSansDV-VF.woff2
+    /etc/nocturne/ui-backup-20250703-001228/fonts/Inter-SemiBold.woff2
+
+--- process_info ---
+Top CPU Processes:
+  PID    CPU%  MEM%  COMMAND
+  USER   TIME  COMMAND PID   USER     TIME  COMMAND
+  root   0:00  awk   COMMAND } NR>1 {printf "  %-6s %-5s %-5s %s  ", $2, $3, $4, substr($0, index($0, $11))}
+  root   0:00  head   3416 root      0:00 head -n 6
+  root   0:00  sort   3415 root      0:00 sort -rnk 3
+  root   0:00  ps     3414 root      0:00 ps aux
+
+Top Memory Processes:
+  PID    CPU%  MEM%  COMMAND
+  root   0:00  awk   COMMAND } NR>1 {printf "  %-6s %-5s %-5s %s  ", $2, $3, $4, substr($0, index($0, $11))}
+  root   0:00  head   3420 root      0:00 head -n 6
+  root   0:00  sort   3419 root      0:00 sort -rnk 4
+  root   0:00  ps     3418 root      0:00 ps aux
+  root   0:00  sh     3223 root      0:00 sh -s
+
+--- api_health ---
+API Health Check:
+  Nocturned API (port 5000): ✓ Listening
+  Media Status: ✓ Accessible
+  Bluetooth Status: ✗ Not accessible
+  UI (port 3000): ✓ Accessible
+
+--- recent_logs ---
+Recent Kernel Messages (last 10):
+  [ 8245.468521] fb: unsupport fmt:0
+  [ 8245.500428] dropbear[3222]: Password auth succeeded for 'root' from 172.16.42.1:40440
+  [ 8245.554704] fb: unsupport fmt:0
+  [ 8245.644712] fb: unsupport fmt:0
+  [ 8245.760694] fb: unsupport fmt:0
+  [ 8245.871763] fb: unsupport fmt:0
+  [ 8245.958061] fb: unsupport fmt:0
+  [ 8246.055191] fb: unsupport fmt:0
+  [ 8246.145156] fb: unsupport fmt:0
+  [ 8246.245412] fb: unsupport fmt:0
+
+Recent System Log (last 10):
+    No system log available
+
+=== END OF SYSTEM MAP ===
+Generated at: Thu Jan  1 02:17:32 UTC 2015

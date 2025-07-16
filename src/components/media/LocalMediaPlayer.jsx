@@ -169,7 +169,8 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     seekTo,
     setVolume,
     formatTime,
-    checkMediaStatus
+    checkMediaStatus,
+    initialLoadComplete
   } = useLocalMedia();
 
   const handleRetry = () => {
@@ -359,6 +360,15 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
                 >
                   Retry Connection
                 </button>
+              </div>
+            ) : !initialLoadComplete ? (
+              <div className="text-center">
+                <div className="flex justify-center mb-3">
+                  <div className="animate-pulse">
+                    <BluetoothIcon className="w-12 h-12 text-gray-400" />
+                  </div>
+                </div>
+                <div className="text-gray-400 text-sm">Checking connection...</div>
               </div>
             ) : !isConnected ? (
               <div className="text-center">

@@ -1,0 +1,9 @@
+USER=root
+SSH_CLIENT=172.16.42.1 50754 22
+SHLVL=1
+HOME=/root
+LOGNAME=root
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+SHELL=/bin/sh
+PWD=/root
+SSH_CONNECTION=172.16.42.1 50754 172.16.42.2 22

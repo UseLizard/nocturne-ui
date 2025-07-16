@@ -1008,6 +1008,50 @@ export const useBluetooth = () => {
     };
   }, [addMessageListener, removeMessageListener, handleWsMessage, cleanup]);
 
+  // BLE-specific functions
+  const getBleStatus = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/media/ble/status`);
+      if (!response.ok) {
+        throw new Error('Failed to get BLE status');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting BLE status:', error);
+      return { connected: false, status: 'error' };
+    }
+  }, []);
+
+  const connectBle = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/media/ble/connect`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to trigger BLE connection');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error connecting BLE:', error);
+      return { status: 'error' };
+    }
+  }, []);
+
+  const disconnectBle = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/media/ble/disconnect`, {
+        method: 'POST',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to disconnect BLE');
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error disconnecting BLE:', error);
+      return { status: 'error' };
+    }
+  }, []);
+
   return {
     devices,
     loading,
@@ -1029,6 +1073,10 @@ export const useBluetooth = () => {
     wsConnected,
     stopRetrying,
     reconnectAttempt,
-    attemptReconnect
+    attemptReconnect,
+    // BLE-specific functions
+    getBleStatus,
+    connectBle,
+    disconnectBle
   };
 };

@@ -1,0 +1,4 @@
+Bluetooth Settings Backup
+Created: Tue Jul  8 05:49:31 PM EDT 2025
+Car Thing IP: 172.16.42.2
+Backup Path: /home/paultownwrites/Google Drive/nocturne-ui/bluetooth_backups/backup_20250708_174930

@@ -1,0 +1,629 @@
+Welcome to Nocturne!
+
+If you are experienced and you want to change something, you may
+remount the rootfs as read-write with: mount -o remount,rw /
+
+You can set the active boot slot using the uboot_tool utility,
+or flash an image to the inactive slot using the ab_flash utility.
+
+* GitHub: https://github.com/usenocturne/nocturne-image
+
+====================================================
+      NOCTURNE - IN-DEPTH SYSTEM REPORT
+====================================================
+
+Generated on: Wed Dec 31 22:21:13 EST 2014
+
+## System Startup & Service Initialization Map
+Runit starts services by running everything linked in /var/service.
+There is no strict, numbered runlevel order like older init systems.
+Dependencies are handled within the individual 'run' scripts (e.g., 'sv check <service> || exit 1').
+
+1. General System Configuration (loaded early):
+--------------------------------------------------
+# /etc/rc.conf - system configuration for void
+
+# Set the host name.
+#
+# NOTE: it's preferred to declare the hostname in /etc/hostname instead:
+# 	- echo myhost > /etc/hostname
+#
+#HOSTNAME="void-live"
+
+# Set RTC to UTC or localtime.
+#HARDWARECLOCK="UTC"
+
+# Set timezone, availables timezones can be found at /usr/share/zoneinfo.
+#
+# NOTE: it's preferred to set the timezone in /etc/localtime instead:
+#  - ln -sf /usr/share/zoneinfo/<timezone> /etc/localtime
+# Setting the timezone here requires a reboot to apply any changes/fixes
+# and read-write access to the filesystem.
+#
+#TIMEZONE="Europe/Madrid"
+
+# Keymap to load, see loadkeys(8).
+#KEYMAP="es"
+
+# Console font to load, see setfont(8).
+#FONT="lat9w-16"
+
+# Console map to load, see setfont(8).
+#FONT_MAP=
+
+# Font unimap to load, see setfont(8).
+#FONT_UNIMAP=
+
+# Amount of ttys which should be setup.
+#TTYS=
+
+# Set the mode for cgroup mounts.
+# hybrid: mount cgroup v1 under /sys/fs/cgroup and
+#         cgroup v2 under /sys/fs/cgroup/unified
+# legacy: mount cgroup v1 /sys/fs/cgroup
+# unified: mount cgroup v2 under /sys/fs/cgroup
+#CGROUP_MODE=unified
+
+# Set this to true only if you do not want seed files to actually credit the
+# RNG, for example if you plan to replicate this file system image and do not
+# have the wherewithal to first delete the contents of /var/lib/seedrng.
+#SEEDRNG_SKIP_CREDIT=false
+--------------------------------------------------
+
+2. Enabled Services (symlinks in /var/service point to definitions in /etc/sv):
+total 0
+lrwxrwxrwx    1 root     root            22 Jul  5  2025 NetworkManager -> /etc/sv/NetworkManager
+lrwxrwxrwx    1 root     root            23 Jul  5  2025 auto_brightness -> /etc/sv/auto_brightness
+lrwxrwxrwx    1 root     root            25 Jul  5  2025 bluetooth_adapter -> /etc/sv/bluetooth_adapter
+lrwxrwxrwx    1 root     root            18 Jul  5  2025 bluetoothd -> /etc/sv/bluetoothd
+lrwxrwxrwx    1 root     root            20 Jul  5  2025 busybox-ntpd -> /etc/sv/busybox-ntpd
+lrwxrwxrwx    1 root     root            16 Jul  5  2025 chromium -> /etc/sv/chromium
+lrwxrwxrwx    1 root     root            12 Jul  5  2025 dbus -> /etc/sv/dbus
+lrwxrwxrwx    1 root     root            15 Jul  5  2025 dnsmasq -> /etc/sv/dnsmasq
+lrwxrwxrwx    1 root     root            19 Jul  5  2025 nocturne-ui -> /etc/sv/nocturne-ui
+lrwxrwxrwx    1 root     root            17 Jul  5  2025 nocturned -> /etc/sv/nocturned
+lrwxrwxrwx    1 root     root            13 Jul  5  2025 seatd -> /etc/sv/seatd
+lrwxrwxrwx    1 root     root            12 Jul  5  2025 sshd -> /etc/sv/sshd
+lrwxrwxrwx    1 root     root            22 Jul  5  2025 superbird_init -> /etc/sv/superbird_init
+lrwxrwxrwx    1 root     root            13 Jul  5  2025 udevd -> /etc/sv/udevd
+lrwxrwxrwx    1 root     root            18 Jul  5  2025 usb-gadget -> /etc/sv/usb-gadget
+lrwxrwxrwx    1 root     root            14 Jul  5  2025 weston -> /etc/sv/weston
+
+3. Local Startup Script (runs after core services):
+--------------------------------------------------
+#!/bin/sh
+# Default rc.local for void; add your custom commands here.
+#
+# This is run by runit in stage 2 before the services are executed
+# (see /etc/runit/2).
+--------------------------------------------------
+
+## System & Hardware
+Hostname: nocturne
+Kernel: Linux nocturne 4.9.113 #1 SMP PREEMPT Mon May 4 04:20:20 UTC 2020 aarch64 Linux
+
+Memory Usage:
+               total        used        free      shared  buff/cache   available
+Mem:           488Mi       234Mi        46Mi          0B       217Mi       254Mi
+Swap:          255Mi        21Mi       234Mi
+
+Disk & Filesystem Mounts:
+Filesystem                Size      Used Available Use% Mounted on
+/dev/root               491.1M    418.0M     37.0M  92% /
+/dev/data                 2.0G    281.8M      1.6G  15% /var
+/dev/settings           229.9M    118.0K    213.0M   0% /var/lib
+/dev/data                 2.0G    281.8M      1.6G  15% /root
+
+Uptime: up 3 hours, 21 minutes
+
+## Runit Service Status & Definitions
+Listing status of all enabled services in /var/service/...
+run: /var/service/NetworkManager: (pid 2460) 12064s; run: log: (pid 2458) 12064s
+run: /var/service/auto_brightness: (pid 2443) 12064s
+run: /var/service/bluetooth_adapter: (pid 2441) 12064s
+run: /var/service/bluetoothd: (pid 2442) 12064s; run: log: (pid 2440) 12064s
+run: /var/service/busybox-ntpd: (pid 2459) 12064s; run: log: (pid 2457) 12064s
+run: /var/service/chromium: (pid 1809) 740s
+run: /var/service/dbus: (pid 2449) 12064s; run: log: (pid 2447) 12064s
+down: /var/service/dnsmasq: 0s, normally up, want up; run: log: (pid 2455) 12064s
+run: /var/service/nocturne-ui: (pid 1785) 740s
+run: /var/service/nocturned: (pid 2756) 12061s
+run: /var/service/seatd: (pid 2446) 12064s; run: log: (pid 2444) 12064s
+run: /var/service/sshd: (pid 2463) 12064s; run: log: (pid 2462) 12064s
+run: /var/service/superbird_init: (pid 2448) 12064s
+run: /var/service/udevd: (pid 2452) 12064s; run: log: (pid 2451) 12064s
+run: /var/service/usb-gadget: (pid 2445) 12064s
+run: /var/service/weston: (pid 2450) 12064s
+
+Listing all available service definitions in /etc/sv/...
+total 152
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 NetworkManager
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-console
+drwxr-xr-x    2 root     root          4096 Feb  1  2025 agetty-generic
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-hvc0
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-hvsi0
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-serial
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-tty1
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-tty2
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-tty3
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-tty4
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-tty5
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-tty6
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-ttyAMA0
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-ttyS0
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 agetty-ttyUSB0
+drwxr-xr-x    2 1000     1000          4096 Jul  5  2025 auto_brightness
+drwxr-xr-x    2 1000     1000          4096 Jul  5  2025 bluetooth_adapter
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 bluetoothd
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 busybox-klogd
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 busybox-ntpd
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 busybox-syslogd
+drwxr-xr-x    2 1000     1000          4096 Jul  5  2025 chromium
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 dbus
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 dhclient
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 dnsmasq
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 ip6tables
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 iptables
+drwxr-xr-x    2 1000     1000          4096 Jul  5  2025 nocturne-ui
+drwxr-xr-x    2 1000     1000          4096 Jul  5  2025 nocturned
+lrwxrwxrwx    1 root     root            12 Jul  5  2025 ntpd -> busybox-ntpd
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 seatd
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 sshd
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 sulogin
+drwxr-xr-x    2 1000     1000          4096 Jul  5  2025 superbird_init
+drwxr-xr-x    3 root     root          4096 Feb  1  2025 udevd
+drwxr-xr-x    2 1000     1000          4096 Jul  5  2025 usb-gadget
+drwxr-xr-x    3 root     root          4096 Feb  1  2025 uuidd
+drwxr-xr-x    2 1000     1000          4096 Jul  5  2025 weston
+drwxr-xr-x    3 root     root          4096 Jul  5  2025 wpa_supplicant
+
+## Process Tree & Interactions
+Full process tree showing parent/child relationships:
+  PID  PGID   SID TTY          TIME CMD
+    2     0     0 ?        00:00:00 kthreadd
+    3     0     0 ?        00:00:02   ksoftirqd/0
+    5     0     0 ?        00:00:00   kworker/0:0H
+    7     0     0 ?        00:00:40   rcu_preempt
+    8     0     0 ?        00:00:00   rcu_sched
+    9     0     0 ?        00:00:00   rcu_bh
+   10     0     0 ?        00:00:00   migration/0
+   11     0     0 ?        00:00:00   lru-add-drain
+   12     0     0 ?        00:00:00   watchdog/0
+   13     0     0 ?        00:00:00   cpuhp/0
+   14     0     0 ?        00:00:00   cpuhp/1
+   15     0     0 ?        00:00:00   watchdog/1
+   16     0     0 ?        00:00:00   migration/1
+   17     0     0 ?        00:00:00   ksoftirqd/1
+   19     0     0 ?        00:00:00   kworker/1:0H
+   20     0     0 ?        00:00:00   cpuhp/2
+   21     0     0 ?        00:00:00   watchdog/2
+   22     0     0 ?        00:00:00   migration/2
+   23     0     0 ?        00:00:00   ksoftirqd/2
+   24     0     0 ?        00:00:00   kworker/2:0
+   25     0     0 ?        00:00:00   kworker/2:0H
+   26     0     0 ?        00:00:00   cpuhp/3
+   27     0     0 ?        00:00:00   watchdog/3
+   28     0     0 ?        00:00:00   migration/3
+   29     0     0 ?        00:00:00   ksoftirqd/3
+   30     0     0 ?        00:00:00   kworker/3:0
+   31     0     0 ?        00:00:00   kworker/3:0H
+   32     0     0 ?        00:00:00   kdevtmpfs
+  817     0     0 ?        00:00:00   oom_reaper
+  818     0     0 ?        00:00:00   writeback
+  820     0     0 ?        00:00:00   kcompactd0
+  821     0     0 ?        00:00:00   crypto
+  822     0     0 ?        00:00:00   bioset
+  824     0     0 ?        00:00:00   kblockd
+  846     0     0 ?        00:00:00   devfreq_wq
+  852     0     0 ?        00:00:00   lcd_work_queue
+  873     0     0 ?        00:00:00   watchdogd
+  960     0     0 ?        00:00:00   gp_pll
+  965     0     0 ?        00:00:01   kworker/3:1
+  997     0     0 ?        00:00:02   kswapd0
+  998     0     0 ?        00:00:00   vmstat
+ 1072     0     0 ?        00:00:00   SquashFS read w
+ 1080     0     0 ?        00:00:00   ecryptfs-kthrea
+ 1194     0     0 ?        00:00:00   hwrng
+ 1198     0     0 ?        00:00:00   bioset
+ 1201     0     0 ?        00:00:00   bioset
+ 1204     0     0 ?        00:00:00   bioset
+ 1207     0     0 ?        00:00:00   bioset
+ 1210     0     0 ?        00:00:00   bioset
+ 1213     0     0 ?        00:00:00   bioset
+ 1216     0     0 ?        00:00:00   bioset
+ 1219     0     0 ?        00:00:00   bioset
+ 1223     0     0 ?        00:00:00   bioset
+ 1243     0     0 ?        00:00:00   kworker/0:1
+ 1246     0     0 ?        00:00:00   irq/57-rotary-e
+ 1247     0     0 ?        00:00:00   irq/58-rotary-e
+ 1256     0     0 ?        00:00:00   dm_bufio_cache
+ 1259     0     0 ?        00:00:00   cfinteractive
+ 1287     0     0 ?        00:00:06   kworker/1:1
+ 1330     0     0 ?        00:00:00   null
+ 1331     0     0 ?        00:00:00   cpu_hogplug_thr
+ 1344     0     0 ?        00:00:00   vmalloc_ion
+ 1345     0     0 ?        00:00:00   codec_mm_ion
+ 1360     0     0 ?        00:00:00   videosync
+ 1364     0     0 ?        00:00:00   irq/50-meson-am
+ 1376     0     0 ?        00:00:00   bioset
+ 1377     0     0 ?        00:00:02   mmcqd/0
+ 1378     0     0 ?        00:00:00   bioset
+ 1379     0     0 ?        00:00:00   mmcqd/0boot0
+ 1380     0     0 ?        00:00:00   bioset
+ 1381     0     0 ?        00:00:00   mmcqd/0boot1
+ 1382     0     0 ?        00:00:00   bioset
+ 1383     0     0 ?        00:00:00   mmcqd/0rpmb
+ 1429     0     0 ?        00:00:00   irq/25-meson-g1
+ 1441     0     0 ?        00:00:00   cma_task0
+ 1442     0     0 ?        00:00:00   cma_task1
+ 1443     0     0 ?        00:00:00   cma_task2
+ 1444     0     0 ?        00:00:00   cma_task3
+ 1510     0     0 ?        00:00:00   ipv6_addrconf
+ 1521     0     0 ?        00:00:00   krfcommd
+ 1528     0     0 ?        00:00:00   kworker/1:2
+ 1539     0     0 ?        00:00:00   dwc_otg
+ 1542     0     0 ?        00:00:00   tlsc6x_resume_w
+ 1545     0     0 ?        00:00:00   tlsc6x_esd_help
+ 1546     0     0 ?        00:00:00   tlsc6x_wq
+ 1552     0     0 ?        00:00:00   bl_power_on_que
+ 1563     0     0 ?        00:00:00   jbd2/mmcblk0p14
+ 1564     0     0 ?        00:00:00   ext4-rsv-conver
+ 2368     0     0 ?        00:00:00   jbd2/mmcblk0p18
+ 2369     0     0 ?        00:00:00   ext4-rsv-conver
+ 2370     0     0 ?        00:00:00   kworker/2:1H
+ 2371     0     0 ?        00:00:00   jbd2/mmcblk0p17
+ 2372     0     0 ?        00:00:00   ext4-rsv-conver
+ 2375     0     0 ?        00:00:00   kworker/0:1H
+ 2531     0     0 ?        00:00:00   kbase_job_fault
+ 2571     0     0 ?        00:00:00   kbase_event
+ 2606     0     0 ?        00:00:00   kbase_event
+ 2607     0     0 ?        00:00:00   kbase_event
+ 2646     0     0 ?        00:00:00   hci0
+ 2647     0     0 ?        00:00:00   hci0
+ 2651     0     0 ?        00:00:18   kworker/u9:3
+ 2689     0     0 ?        00:00:00   kworker/1:1H
+ 2786     0     0 ?        00:00:00   kworker/3:1H
+ 3365     0     0 ?        00:00:01   kworker/2:2
+ 5980     0     0 ?        00:00:00   kbnepd bnep0
+27646     0     0 ?        00:00:04   kworker/u8:2
+15375     0     0 ?        00:00:19   kworker/u9:1
+ 1841     0     0 ?        00:00:00   kbase_event
+ 1879     0     0 ?        00:00:02   kworker/u8:0
+ 1918     0     0 ?        00:00:18   kworker/u9:0
+10929     0     0 ?        00:00:02   kworker/0:0
+12604     0     0 ?        00:00:00   kworker/u8:3
+    1     1     1 ?        00:00:04 runit
+ 1601  1601  1601 ?        00:01:35   udevd
+ 1603  1601  1601 ?        00:00:00     udevd
+ 1606  1601  1601 ?        00:00:00     udevd
+ 1608  1601  1601 ?        00:00:00     udevd
+ 1619  1601  1601 ?        00:00:00     udevd
+ 1638  1601  1601 ?        00:01:43     udevd
+ 1673  1601  1601 ?        00:00:00     udevd
+ 1681  1601  1601 ?        00:00:00     udevd
+ 1690  1601  1601 ?        00:00:00     udevd
+ 1762  1601  1601 ?        00:00:00     udevd
+ 1957  1601  1601 ?        00:00:00     udevd
+ 1976  1601  1601 ?        00:00:00     udevd
+ 1993  1601  1601 ?        00:00:00     udevd
+ 2006  1601  1601 ?        00:00:00     udevd
+ 2328  1601  1601 ?        00:00:00     udevd
+ 2329  1601  1601 ?        00:00:00     udevd
+ 2330  1601  1601 ?        00:00:00     udevd
+ 2417  2417  2417 ?        00:00:00   runsvdir
+ 2423  2423  2423 ?        00:00:00     runsv
+ 2756  2423  2423 ?        00:00:59       nocturned
+ 2424  2424  2424 ?        00:00:00     runsv
+ 2447  2424  2424 ?        00:00:00       vlogger
+ 2449  2424  2424 ?        00:00:00       dbus-daemon
+ 2425  2425  2425 ?        00:00:00     runsv
+ 2440  2425  2425 ?        00:00:00       vlogger
+ 2442  2425  2425 ?        00:00:00       bluetoothd
+ 2426  2426  2426 ?        00:00:00     runsv
+ 1785  2426  2426 ?        00:00:00       static-web-serv
+ 2427  2427  2427 ?        00:00:00     runsv
+ 2457  2427  2427 ?        00:00:00       vlogger
+ 2459  2427  2427 ?        00:00:00       busybox
+ 2428  2428  2428 ?        00:00:13     runsv
+ 2455  2428  2428 ?        00:00:02       vlogger
+ 2429  2429  2429 ?        00:00:00     runsv
+ 2444  2429  2429 ?        00:00:00       vlogger
+ 2446  2429  2429 ?        00:00:00       seatd
+ 2430  2430  2430 ?        00:00:00     runsv
+ 2443  2430  2430 ?        00:03:47       sp-als-backligh
+ 2431  2431  2431 ?        00:00:00     runsv
+ 1809  2431  2431 ?        00:20:24       chrome
+ 1815  2431  2431 ?        00:00:00         chrome
+ 1863  2431  2431 ?        00:19:09           chrome
+ 2019  2431  2431 ?        00:00:00         chrome
+ 2432  2432  2432 ?        00:00:00     runsv
+ 2462  2432  2432 ?        00:00:00       vlogger
+ 2463  2432  2432 ?        00:00:00       sshd
+30303 30303 30303 ?        00:00:00         sshd-session
+30383 30303 30303 ?        00:00:00           sshd-session
+30386 30386 30386 pts/0    00:00:00             bash
+19440 19440 19440 ?        00:00:00         sshd-session
+19506 19440 19440 ?        00:00:00           sshd-session
+19508 19508 19508 pts/1    00:00:00             bash
+20293 20293 20293 ?        00:00:00         sshd-session
+20306 20293 20293 ?        00:00:00           sshd-session
+20308 20308 20308 ?        00:00:00             bash
+20325 20308 20308 ?        00:00:00               ps
+ 2433  2433  2433 ?        00:00:00     runsv
+ 2458  2433  2433 ?        00:00:00       vlogger
+ 2460  2433  2433 ?        00:00:01       NetworkManager
+ 5985  5985  2433 ?        00:00:00         dhclient
+ 2434  2434  2434 ?        00:00:00     runsv
+ 2450  2434  2434 ?        00:01:08       weston
+ 2604  2434  2434 ?        00:00:00         weston-keyboard
+ 2605  2434  2434 ?        00:00:00         weston-desktop-
+ 2435  2435  2435 ?        00:00:00     runsv
+ 2451  2435  2435 ?        00:00:00       vlogger
+ 2452  2435  2435 ?        00:01:55       udevd
+ 2487  2435  2435 ?        00:00:00         udevd
+ 2522  2435  2435 ?        00:00:00         udevd
+ 2543  2435  2435 ?        00:00:00         udevd
+ 2544  2435  2435 ?        00:00:00         udevd
+ 2550  2435  2435 ?        00:01:42         udevd
+ 2436  2436  2436 ?        00:00:00     runsv
+ 2445  2436  2436 ?        00:00:00       sleep
+ 2437  2437  2437 ?        00:00:00     runsv
+ 2441  2437  2437 ?        00:00:00       btattach
+ 2438  2438  2438 ?        00:00:00     runsv
+ 2448  2438  2438 ?        00:00:00       sleep
+
+--- Weston (Display Server) ---
+root      2434  0.0  0.1   1932   576 ?        Ss   19:00   0:00 runsv weston
+root      2450  0.5  1.2  97432  6080 ?        Sl   19:00   1:08 /usr/bin/weston --tty=4 --config=/etc/weston/weston.ini
+root      2604  0.0  0.7  97752  3920 ?        Sl   19:00   0:00 /usr/libexec/weston-keyboard
+root      2605  0.0  0.3  98072  1732 ?        Sl   19:00   0:00 /usr/libexec/weston-desktop-shell
+#!/bin/sh
+
+exec 2>&1
+sv check dbus > /dev/null || exit 1
+sv check seatd > /dev/null || exit 1
+
+modprobe /lib/modules/4.9.113/hardware/aml-4.9/arm/gpu/mali.ko
+
+[ -d /run/wayland ] || mkdir -p /run/wayland
+chmod 0700 /run/wayland
+
+export XDG_RUNTIME_DIR="/run/wayland/"
+export XDG_CACHE_HOME="/var/cache"
+export BREAKPAD_DUMP_LOCATION="/var/cache/chrome_storage/Crash Reports"
+
+udevadm trigger --subsystem-match=input > /dev/null 2>&1
+udevadm settle > /dev/null 2>&1
+
+exec /usr/bin/weston --tty=4 --config=/etc/weston/weston.ini > /dev/null 2>&1
+
+--- Chromium (UI Renderer) ---
+root      1809  165 31.5 510256 157680 ?       Sl   22:08  20:24 /usr/bin/chromium-browser/chrome --no-sandbox --in-process-gpu --remote-debugging-port=2222 --user-data-dir=/var/cache/chrome_storage --kiosk --disable-pinch --allow-file-access-from-files --ignore-certificate-errors --app=http://localhost:80
+root      1815  0.0  4.9 170928 24908 ?        S    22:08   0:00 /usr/bin/chromium-browser/chrome --type=zygote --no-sandbox --user-data-dir=/var/cache/chrome_storage
+root      1863  155 30.9 398988 154608 ?       Rl   22:08  19:10 /usr/bin/chromium-browser/chrome --type=renderer --no-sandbox --field-trial-handle=13512183305359760137,17071151059486625471,131072 --service-pipe-token=14146345754111660621 --lang=en-US --user-data-dir=/var/cache/chrome_storage --enable-offline-auto-reload --enable-offline-auto-reload-visible-only --blink-s
+root      2019  0.0  5.9 204096 29740 ?        Sl   22:08   0:00 /usr/bin/chromium-browser/chrome --type=utility --field-trial-handle=13512183305359760137,17071151059486625471,131072 --lang=en-US --service-sandbox-type=audio --no-sandbox --ignore-certificate-errors --ignore-certificate-errors --user-data-dir=/var/cache/chrome_storage --service-request-channel-token=5962139429120529084 --shared-files
+root      2431  0.0  0.1   1932   584 ?        Ss   19:00   0:00 runsv chromium
+#!/bin/sh
+
+exec 2>&1
+sv check weston > /dev/null || exit 1
+sv check nocturne-ui > /dev/null || exit 1
+
+export XDG_RUNTIME_DIR="/run/wayland/"
+export XDG_CACHE_HOME="/var/cache"
+export BREAKPAD_DUMP_LOCATION="/var/cache/chrome_storage/Crash Reports"
+
+exec /usr/bin/chromium-browser/chrome --no-sandbox --in-process-gpu --remote-debugging-port=2222 --user-data-dir=/var/cache/chrome_storage --kiosk --disable-pinch --allow-file-access-from-files --ignore-certificate-errors --app=http://localhost:80 > /dev/null 2>&1
+
+--- Nocturne-UI (Web Server) ---
+root      1785  0.0  0.5  15424  2632 ?        Sl   22:08   0:00 /usr/bin/static-web-server --host 127.0.0.1 --port 80 --root /etc/nocturne/ui --compression false
+#!/bin/sh
+
+exec 2>&1
+
+exec /usr/bin/static-web-server --host 127.0.0.1 --port 80 --root /etc/nocturne/ui --compression false
+
+## UI Files & Configuration Paths
+UI files are served from: /etc/nocturne/ui
+Listing contents...
+/etc/nocturne/ui:
+total 20
+drwxr-xr-x    2 root     root          4096 Dec 31 22:08 assets
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 fonts
+drwxr-xr-x    4 root     root          4096 Jul  5  2025 images
+-rw-r--r--    1 root     root          2035 Dec 31 22:08 index.html
+-rw-r--r--    1 root     root          2035 Dec 31 19:16 index.html.bak
+
+/etc/nocturne/ui/assets:
+total 2100
+-rw-r--r--    1 root     root         44059 Dec 31 22:08 index-0e4fS8Zk.css
+-rw-r--r--    1 root     root        799430 Dec 31 22:08 index-CQtTe2hQ.js
+-rw-r--r--    1 root     root        822382 Dec 31 22:08 index-legacy-Cfw7bqUE.js
+-rw-r--r--    1 root     root        122019 Dec 31 22:08 polyfills-j9yYi8nw.js
+-rw-r--r--    1 root     root        113906 Dec 31 22:08 polyfills-legacy-D6F95YZ-.js
+-rw-r--r--    1 root     root         94259 Dec 31 22:08 spotify-C6fu5v36.js
+-rw-r--r--    1 root     root         93018 Dec 31 22:08 spotify-legacy-Z2Q3trbx.js
+-rw-r--r--    1 root     root          9347 Dec 31 22:08 ui-BL1Q8NHq.js
+-rw-r--r--    1 root     root          9384 Dec 31 22:08 ui-legacy-C5oFiHF6.js
+-rw-r--r--    1 root     root         11827 Dec 31 22:08 vendor-DJG_os-6.js
+-rw-r--r--    1 root     root         11225 Dec 31 22:08 vendor-legacy-CUW0MvwS.js
+
+/etc/nocturne/ui/fonts:
+total 31316
+-rw-r--r--    1 root     root        114840 Dec 31 22:08 Inter-Bold.woff2
+-rw-r--r--    1 root     root        114348 Dec 31 22:08 Inter-Medium.woff2
+-rw-r--r--    1 root     root        111268 Dec 31 22:08 Inter-Regular.woff2
+-rw-r--r--    1 root     root        114812 Dec 31 22:08 Inter-SemiBold.woff2
+-rw-r--r--    1 root     root       5491244 Jul  4  2025 NotoColorEmoji-Regular.woff2
+-rw-r--r--    1 root     root        125240 Dec 31 22:08 NotoNaskhAR-VF.woff2
+-rw-r--r--    1 root     root        258476 Dec 31 22:08 NotoSansBN-VF.woff2
+-rw-r--r--    1 root     root        260028 Dec 31 22:08 NotoSansDV-VF.woff2
+-rw-r--r--    1 root     root        112196 Dec 31 22:08 NotoSansGK-VF.woff2
+-rw-r--r--    1 root     root         58000 Dec 31 22:08 NotoSansHE-VF.woff2
+-rw-r--r--    1 root     root       7799708 Dec 31 22:08 NotoSansSC-VF.woff2
+-rw-r--r--    1 root     root        146936 Dec 31 22:08 NotoSansTA-VF.woff2
+-rw-r--r--    1 root     root       5422704 Dec 31 22:08 NotoSansTC-VF.woff2
+-rw-r--r--    1 root     root        107464 Dec 31 22:08 NotoSansTH-VF.woff2
+-rw-r--r--    1 root     root       5950312 Dec 31 22:08 NotoSerifJP-VF.woff2
+-rw-r--r--    1 root     root       5842700 Dec 31 22:08 NotoSerifKR-VF.woff2
+
+/etc/nocturne/ui/images:
+total 16
+-rw-r--r--    1 root     root          6110 Dec 31 22:08 not-playing.webp
+drwxr-xr-x    4 root     root          4096 Jul  5  2025 os
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 radio-cover
+
+/etc/nocturne/ui/images/os:
+total 8
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 connector
+drwxr-xr-x    2 root     root          4096 Jul  5  2025 nocturne
+
+/etc/nocturne/ui/images/os/connector:
+total 4
+-rw-r--r--    1 root     root          2054 Dec 31 22:08 1.0.0.webp
+
+/etc/nocturne/ui/images/os/nocturne:
+total 8
+-rw-r--r--    1 root     root          7198 Dec 31 22:08 3.0.0.webp
+
+/etc/nocturne/ui/images/radio-cover:
+total 28
+-rw-r--r--    1 root     root          7532 Dec 31 22:08 discoveries.webp
+-rw-r--r--    1 root     root          6988 Dec 31 22:08 dj.webp
+-rw-r--r--    1 root     root          8862 Dec 31 22:08 top.webp
+
+Chromium user data is stored at: /var/cache/chrome_storage
+Listing contents...
+total 8264
+-rw-------    1 root     root       8388608 Dec 31 22:10 BrowserMetrics-spare.pma
+drwx------    2 root     root          4096 Dec 31 19:00 CertificateRevocation
+drwx------    2 root     root          4096 Dec 31 19:00 CertificateTransparency
+drwx------   12 root     root          4096 Dec 31 22:09 Default
+drwx------    2 root     root          4096 Dec 31 19:00 FileTypePolicies
+-rw-r--r--    1 root     root             0 Dec 31 19:00 First Run
+drwx------    2 root     root          4096 Dec 31 19:00 InterventionPolicyDatabase
+-rw-------    1 root     root          2125 Dec 31 22:09 Local State
+drwx------    2 root     root          4096 Dec 31 19:00 MEIPreload
+drwx------    2 root     root          4096 Dec 31 19:00 NativeMessagingHosts
+drwx------    2 root     root          4096 Dec 31 19:00 OriginTrials
+drwx------    2 root     root          4096 Dec 31 19:00 SSLErrorAssistant
+drwx------    2 root     root          4096 Dec 31 19:00 Safe Browsing
+-rw-r--r--    1 root     root         20480 Dec 31 19:02 Safe Browsing Cookies
+-rw-r--r--    1 root     root             0 Dec 31 19:02 Safe Browsing Cookies-journal
+drwx------    3 root     root          4096 Dec 31 19:00 ShaderCache
+lrwxrwxrwx    1 root     root            20 Dec 31 22:08 SingletonCookie -> 15616841333916010722
+lrwxrwxrwx    1 root     root            13 Dec 31 22:08 SingletonLock -> nocturne-1809
+lrwxrwxrwx    1 root     root            50 Dec 31 22:08 SingletonSocket -> /tmp/.org.chromium.Chromium.fV1IG2/SingletonSocket
+drwx------    3 root     root          4096 Dec 31 19:00 Subresource Filter
+
+## Network Configuration & Connections
+IP Addresses:
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: tunl0@NONE: <NOARP> mtu 1480 qdisc noop state DOWN group default qlen 1
+    link/ipip 0.0.0.0 brd 0.0.0.0
+3: ip_vti0@NONE: <NOARP> mtu 1480 qdisc noop state DOWN group default qlen 1
+    link/ipip 0.0.0.0 brd 0.0.0.0
+4: ip6_vti0@NONE: <NOARP> mtu 1500 qdisc noop state DOWN group default qlen 1
+    link/tunnel6 :: brd ::
+5: sit0@NONE: <NOARP> mtu 1480 qdisc noop state DOWN group default qlen 1
+    link/sit 0.0.0.0 brd 0.0.0.0
+6: ip6tnl0@NONE: <NOARP> mtu 1452 qdisc noop state DOWN group default qlen 1
+    link/tunnel6 :: brd ::
+7: usb0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether a0:b1:c2:d3:e4:00 brd ff:ff:ff:ff:ff:ff
+    inet 172.16.42.2/24 brd 172.16.42.255 scope global noprefixroute usb0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::78a4:18c9:e724:431a/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+20: bnep0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UNKNOWN group default qlen 1000
+    link/ether 30:e3:d6:04:eb:49 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.44.33/24 brd 192.168.44.255 scope global dynamic noprefixroute bnep0
+       valid_lft 2239sec preferred_lft 2239sec
+    inet6 fe80::d487:6838:be5c:bf70/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+
+Active Network Sockets (TCP/UDP):
+Proto  Local Address          Foreign Address        State      PID/Program name
+Netid State  Recv-Q Send-Q Local Address:Port  Peer Address:Port Process                                                                 
+udp   UNCONN 0      0            0.0.0.0:68         0.0.0.0:*     users:(("dhclient",pid=5985,fd=5))                                     
+udp   UNCONN 0      0            0.0.0.0:5353       0.0.0.0:*     users:(("chrome",pid=1809,fd=167))                                     
+udp   UNCONN 0      0            0.0.0.0:5353       0.0.0.0:*     users:(("chrome",pid=1809,fd=126))                                     
+udp   UNCONN 0      0            0.0.0.0:5353       0.0.0.0:*     users:(("chrome",pid=1809,fd=124))                                     
+udp   UNCONN 0      0                  *:5353             *:*     users:(("chrome",pid=1809,fd=127))                                     
+udp   UNCONN 0      0                  *:5353             *:*     users:(("chrome",pid=1809,fd=125))                                     
+tcp   LISTEN 0      10         127.0.0.1:2222       0.0.0.0:*     users:(("chrome",pid=1809,fd=99))                                      
+tcp   LISTEN 0      128        127.0.0.1:80         0.0.0.0:*     users:(("static-web-serv",pid=1785,fd=9))                              
+tcp   LISTEN 0      128          0.0.0.0:22         0.0.0.0:*     users:(("sshd",pid=2463,fd=6))                                         
+tcp   ESTAB  0      0        172.16.42.2:22     172.16.42.1:53116 users:(("sshd-session",pid=30383,fd=7),("sshd-session",pid=30303,fd=7))
+tcp   ESTAB  0      0        172.16.42.2:22     172.16.42.1:54440 users:(("sshd-session",pid=20306,fd=7),("sshd-session",pid=20293,fd=7))
+tcp   ESTAB  0      0        172.16.42.2:22     172.16.42.1:33686 users:(("sshd-session",pid=19506,fd=7),("sshd-session",pid=19440,fd=7))
+tcp   LISTEN 0      128                *:5000             *:*     users:(("nocturned",pid=2756,fd=8))                                    
+tcp   LISTEN 0      128             [::]:22            [::]:*     users:(("sshd",pid=2463,fd=7))                                         
+tcp   ESTAB  0      0              [::1]:37720        [::1]:5000  users:(("chrome",pid=1809,fd=154))                                     
+tcp   ESTAB  0      0              [::1]:37714        [::1]:5000  users:(("chrome",pid=1809,fd=148))                                     
+tcp   ESTAB  0      0              [::1]:5000         [::1]:37714 users:(("nocturned",pid=2756,fd=7))                                    
+tcp   ESTAB  0      0              [::1]:5000         [::1]:37720 users:(("nocturned",pid=2756,fd=12))                                   
+
+DNS Configuration:
+# Generated by NetworkManager
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+nameserver 192.168.44.1
+
+## Bluetooth Details
+Bluetooth Service (bluetoothd) Status:
+root      2425  0.0  0.1   1932   596 ?        Ss   19:00   0:00 runsv bluetoothd
+root      2440  0.0  0.1   2052   656 ?        S    19:00   0:00 vlogger -t bluetoothd -p daemon
+root      2442  0.0  0.4   5864  2016 ?        S    19:00   0:00 /usr/libexec/bluetooth/bluetoothd -n
+
+bluetoothd Service Configuration:
+#!/bin/sh
+[ -r ./conf ] && . ./conf
+sv check dbus >/dev/null || exit 1
+exec 2>&1
+exec /usr/libexec/bluetooth/bluetoothd -n ${OPTS}
+
+Bluetooth Hardware Adapter Info:
+
+Paired & Connected Devices (via bluetoothctl):
+[0;94m[motorola edge 2024 (XT2405V)][0m# devices
+Device B0:C2:C7:03:BD:6E motorola edge 2024 (XT2405V)
+[0;94m[motorola edge 2024 (XT2405V)][0m# info
+Device B0:C2:C7:03:BD:6E (public)
+	Name: motorola edge 2024 (XT2405V)
+	Alias: motorola edge 2024 (XT2405V)
+	Class: 0x005a420c (5915148)
+	Icon: phone
+	Paired: yes
+	Bonded: yes
+	Trusted: no
+	Blocked: no
+	Connected: yes
+	LegacyPairing: no
+	UUID: Serial Port               (00001101-0000-1000-8000-00805f9b34fb)
+	UUID: OBEX Object Push          (00001105-0000-1000-8000-00805f9b34fb)
+	UUID: Audio Source              (0000110a-0000-1000-8000-00805f9b34fb)
+	UUID: A/V Remote Control Target (0000110c-0000-1000-8000-00805f9b34fb)
+	UUID: A/V Remote Control        (0000110e-0000-1000-8000-00805f9b34fb)
+	UUID: Headset AG                (00001112-0000-1000-8000-00805f9b34fb)
+	UUID: PANU                      (00001115-0000-1000-8000-00805f9b34fb)
+	UUID: NAP                       (00001116-0000-1000-8000-00805f9b34fb)
+	UUID: Handsfree Audio Gateway   (0000111f-0000-1000-8000-00805f9b34fb)
+	UUID: SIM Access                (0000112d-0000-1000-8000-00805f9b34fb)
+	UUID: Phonebook Access Server   (0000112f-0000-1000-8000-00805f9b34fb)
+	UUID: Message Access Server     (00001132-0000-1000-8000-00805f9b34fb)
+	UUID: PnP Information           (00001200-0000-1000-8000-00805f9b34fb)
+	UUID: Generic Access Profile    (00001800-0000-1000-8000-00805f9b34fb)
+	UUID: Generic Attribute Profile (00001801-0000-1000-8000-00805f9b34fb)
+	UUID: Telephony and Media Audio (00001855-0000-1000-8000-00805f9b34fb)
+	Modalias: bluetooth:v0008p2E81d2020
+[0;94m[motorola edge 2024 (XT2405V)][0m# exit
+[0;94m[motorola edge 2024 (XT2405V)][0m#                                            
+====================================================
+                 END OF REPORT
+====================================================

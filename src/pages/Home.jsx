@@ -3,7 +3,7 @@ import Sidebar from "../components/common/navigation/Sidebar";
 import HorizontalScroll from "../components/common/navigation/HorizontalScroll";
 import Settings from "../components/settings/Settings";
 import LocalMediaPlayer from "../components/media/LocalMediaPlayer";
-import BluetoothMain from "../components/bluetooth/BluetoothMain";
+import BluetoothMainBLE from "../components/bluetooth/BluetoothMainBLE";
 import { useGradientState } from "../hooks/useGradientState";
 import { useNavigation } from "../hooks/useNavigation";
 import { useSpotifyPlayerControls } from "../hooks/useSpotifyPlayerControls";
@@ -777,7 +777,7 @@ export default function Home({
           />
         );
       case "bluetooth":
-        return <BluetoothMain setActiveSection={setActiveSection} />;
+        return <BluetoothMainBLE setActiveSection={setActiveSection} />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-white/50 text-2xl">

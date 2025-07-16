@@ -70,3 +70,8 @@ export { default as BackspaceIcon } from "./BackspaceIcon";
 export { default as ShiftIcon } from "./ShiftIcon";
 export { default as CapsLockIcon } from "./CapsLockIcon";
 export { default as KeyboardHideIcon } from "./KeyboardHideIcon";
+export { default as StopIcon } from "./StopIcon";
+export { default as ChevronDownIcon } from "./ChevronDownIcon";
+export { default as ClockIcon } from "./ClockIcon";
+export { default as FilterIcon } from "./FilterIcon";
+export { default as TrashIcon } from "./TrashIcon";

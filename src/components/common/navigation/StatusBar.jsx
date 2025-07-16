@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { BatteryIcon, BluetoothIcon, SmartphoneIcon, PlayIcon, PauseIcon } from "../../common/icons";
 import { useSettings } from "../../../contexts/SettingsContext";
-import { useBluetooth } from "../../../hooks/useNocturned";
+import { useBluetooth, useNocturned } from "../../../hooks/useNocturned";
 import { useLocalMedia } from "../../../hooks/useLocalMedia";
 
 let cachedTimezone = null;
@@ -14,9 +14,11 @@ export default function StatusBar() {
   const [isBluetoothConnected, setIsBluetoothConnected] = useState(true);
   const [batteryPercentage, setBatteryPercentage] = useState(80);
   const [timezone, setTimezone] = useState(cachedTimezone);
+  const [lastTimeSync, setLastTimeSync] = useState(null);
   const { settings } = useSettings();
   const { devices, wsConnected } = useBluetooth();
   const { isConnected: isMediaConnected, isPlaying, currentTrack } = useLocalMedia();
+  const { addMessageListener, removeMessageListener } = useNocturned();
 
   useEffect(() => {
     const fetchTimezone = async () => {
@@ -48,6 +50,32 @@ export default function StatusBar() {
 
     fetchTimezone();
   }, []);
+
+  // Listen for time sync updates from BLE connection
+  useEffect(() => {
+    const handleTimeUpdate = (data) => {
+      if (data.type === 'system/time_updated') {
+        console.log('Time sync received:', data.payload);
+        setLastTimeSync(data.payload.timestamp_ms);
+        
+        // Update timezone if provided
+        if (data.payload.timezone) {
+          cachedTimezone = data.payload.timezone;
+          setTimezone(data.payload.timezone);
+        }
+        
+        // Force immediate time update
+        const event = new Event('timeFormatChanged');
+        window.dispatchEvent(event);
+      }
+    };
+
+    const listenerId = addMessageListener('status-bar', handleTimeUpdate);
+    
+    return () => {
+      removeMessageListener(listenerId);
+    };
+  }, [addMessageListener, removeMessageListener]);
 
   // Get connected Bluetooth devices
   const connectedDevices = devices.filter(device => device.connected);

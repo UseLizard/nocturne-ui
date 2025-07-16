@@ -1,0 +1,11 @@
+#!/sbin/openrc-run
+# shellcheck shell=ash
+
+name="nocturned"
+supervisor="supervise-daemon"
+command="/usr/sbin/nocturned"
+command_args="--" # Necessary for supervise-daemon
+
+depend() {
+    need localmount dbus bluetooth bluetooth_adapter bluetooth network-bridge
+}

@@ -1,0 +1,447 @@
+--- System Information Map ---
+Date: Thu Jan  1 01:52:26 UTC 2015
+Hostname: nocturne
+-----------------------------
+
+--- 1. Basic System Information ---
+Kernel: Linux nocturne 4.9.113 #1-NixOS SMP PREEMPT Tue Jan 1 00:00:00 UTC 1980 aarch64 GNU/Linux
+OS Release: NAME="Alpine Linux"
+ID=alpine
+VERSION_ID=3.21.3
+PRETTY_NAME="Alpine Linux v3.21"
+HOME_URL="https://alpinelinux.org/"
+BUG_REPORT_URL="https://gitlab.alpinelinux.org/alpine/aports/-/issues"
+Uptime:  01:52:26 up  1:52,  0 users,  load average: 2.75, 2.54, 2.41
+CPU Info: 
+Memory Info:
+              total        used        free      shared  buff/cache   available
+Mem:         484.8M      217.0M       46.7M       12.8M      221.2M      246.9M
+Swap:        256.0M       40.8M      215.2M
+Disk Usage:
+Filesystem      Size  Used Avail Use% Mounted on
+/dev/root       1.2G  1.2G     0 100% /
+devtmpfs         10M     0   10M   0% /dev
+tmpfs           243M  784K  242M   1% /run
+tmpfs           243M   12M  231M   5% /dev/shm
+/dev/mmcblk0p1   32M  1.8M   31M   6% /uboot
+/dev/mmcblk0p4  957M  274M  618M  31% /data
+tmpfs           243M     0  243M   0% /tmp
+tmpfs           243M  8.0K  243M   1% /run/lock
+
+--- 2. Running Processes and Services ---
+Top 10 CPU Consumers (snapshot):
+ 2634 root     37:29 /usr/lib/chromium/chromium --type=gpu-process --no-sandbox --ozone-platform=wayland --crashpad-handler-pid=0 --enable-crash-reporter=,Alpine Linux --noerrdialogs --user-data-dir=/data/etc/chrome/data --change-stack-guard-on-fork=enable --gpu-preferences=UAAAAAAAAAAgAAAEAAAAAAAAAAAAAAAAAABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAIAAAAAAAAAAgAAAAAAAAA --use-gl=disabled --shared-files --field-trial-handle=3,i,1113793099159233962,8290013721599191776,262144 --disable-features=OverscrollHistoryNavigation,TouchpadOverscrollHistoryNavigation --variations-seed-version
+ 2537 root      5:42 /usr/bin/weston --continue-without-input --config=/etc/weston/weston.ini -- chromium --no-gpu --disable-gpu --disable-gpu-compositing --ozone-platform-hint=auto --ozone-platform=wayland --enable-wayland-ime --no-sandbox --autoplay-policy=no-user-gesture-required --use-fake-ui-for-media-stream --use-fake-device-for-media-stream --disable-sync --force-device-scale-factor=1.0 --pull-to-refresh=0 --noerrdialogs --no-first-run --disable-infobars --fast --fast-start --disable-pinch --disable-translate --overscroll-history-navigation=0 --hide-scrollbars --disable-overlay-scrollbar --disable-features=OverlayScrollbar --disable-features=TranslateUI --disable-features=TouchpadOverscrollHistoryNavigation,OverscrollHistoryNavigation --force-dark-mode --password-store=basic --touch-events=enabled --ignore-certificate-errors --disk-cache-dir=/data/etc/chrome/cache --user-data-dir=/data/etc/chrome/data --kiosk --app=http://localhost:3000
+ 2610 root      4:12 /usr/lib/chromium/chromium --type=renderer --crashpad-handler-pid=0 --enable-crash-reporter=,Alpine Linux --noerrdialogs --user-data-dir=/data/etc/chrome/data --change-stack-guard-on-fork=enable --no-sandbox --autoplay-policy=no-user-gesture-required --force-device-scale-factor=1.0 --touch-events=enabled --use-fake-ui-for-media-stream --ozone-platform=wayland --disable-gpu-compositing --lang=en-US --num-raster-threads=2 --enable-main-frame-before-activation --renderer-client-id=5 --time-ticks-at-unix-epoch=-1420070406235726 --launch-time-ticks=4425983255 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,1113793099159233962,8290013721599191776,262144 --disable-features=OverscrollHistoryNavigation,TouchpadOverscrollHistoryNavigation --variations-s
+PID   USER     TIME  COMMAND
+ 2730 root      0:00 head -n 11
+ 2729 root      0:00 sort -rnk 3
+ 2728 root      0:00 ps aux
+ 2716 root      0:00 sh -s
+ 2715 root      0:00 /usr/sbin/dropbear -2 9
+ 2660 root      0:02 [kworker/u8:2]
+ 2651 root      0:03 [kworker/u8:0]
+Top 10 Memory Consumers (snapshot):
+PID   USER     TIME  COMMAND
+ 2733 root      0:00 head -n 11
+ 2732 root      0:00 sort -rnk 4
+ 2731 root      0:00 ps aux
+ 2716 root      0:00 sh -s
+ 2715 root      0:00 /usr/sbin/dropbear -2 9
+ 2660 root      0:02 [kworker/u8:2]
+ 2651 root      0:03 [kworker/u8:0]
+ 2634 root     37:29 /usr/lib/chromium/chromium --type=gpu-process --no-sandbox --ozone-platform=wayland --crashpad-handler-pid=0 --enable-crash-reporter=,Alpine Linux --noerrdialogs --user-data-dir=/data/etc/chrome/data --change-stack-guard-on-fork=enable --gpu-preferences=UAAAAAAAAAAgAAAEAAAAAAAAAAAAAAAAAABgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAEAAAAAAAAAAIAAAAAAAAAAgAAAAAAAAA --use-gl=disabled --shared-files --field-trial-handle=3,i,1113793099159233962,8290013721599191776,262144 --disable-features=OverscrollHistoryNavigation,TouchpadOverscrollHistoryNavigation --variations-seed-version
+ 2610 root      4:12 /usr/lib/chromium/chromium --type=renderer --crashpad-handler-pid=0 --enable-crash-reporter=,Alpine Linux --noerrdialogs --user-data-dir=/data/etc/chrome/data --change-stack-guard-on-fork=enable --no-sandbox --autoplay-policy=no-user-gesture-required --force-device-scale-factor=1.0 --touch-events=enabled --use-fake-ui-for-media-stream --ozone-platform=wayland --disable-gpu-compositing --lang=en-US --num-raster-threads=2 --enable-main-frame-before-activation --renderer-client-id=5 --time-ticks-at-unix-epoch=-1420070406235726 --launch-time-ticks=4425983255 --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,1113793099159233962,8290013721599191776,262144 --disable-features=OverscrollHistoryNavigation,TouchpadOverscrollHistoryNavigation --variations-s
+ 2595 root      0:00 /usr/lib/chromium/chromium --type=utility --utility-sub-type=storage.mojom.StorageService --lang=en-US --service-sandbox-type=utility --no-sandbox --ignore-certificate-errors --use-fake-device-for-media-stream --ignore-certificate-errors --crashpad-handler-pid=0 --enable-crash-reporter=,Alpine Linux --noerrdialogs --user-data-dir=/data/etc/chrome/data --change-stack-guard-on-fork=enable --shared-files=v8_context_snapshot_data:100 --field-trial-handle=3,i,1113793099159233962,8290013721599191776,262144 --disable-features=OverscrollHistoryNavigation,TouchpadOverscrollHistoryNavigation --variations-seed-version
+All Running Processes (first 20 lines):
+PID   USER     TIME  COMMAND
+    1 root      0:05 /sbin/init
+    2 root      0:00 [kthreadd]
+    3 root      0:00 [ksoftirqd/0]
+    5 root      0:00 [kworker/0:0H]
+    7 root      0:01 [rcu_preempt]
+    8 root      0:07 [rcu_sched]
+    9 root      0:00 [rcu_bh]
+   10 root      0:00 [migration/0]
+   11 root      0:00 [lru-add-drain]
+   12 root      0:00 [watchdog/0]
+   13 root      0:00 [cpuhp/0]
+   14 root      0:00 [cpuhp/1]
+   15 root      0:00 [watchdog/1]
+   16 root      0:00 [migration/1]
+   17 root      0:00 [ksoftirqd/1]
+   19 root      0:00 [kworker/1:0H]
+   20 root      0:00 [cpuhp/2]
+   21 root      0:00 [watchdog/2]
+   22 root      0:00 [migration/2]
+   23 root      0:00 [ksoftirqd/2]
+OpenRC Services (first 20 lines):
+ab_root
+acpid
+agetty
+alsa
+binfmt
+bluealsa
+bluetooth
+bluetooth_adapter
+bootmisc
+caddy
+cgroups
+consolefont
+crond
+data_prepare
+dbus
+devfs
+dmesg
+dropbear
+firstboot
+fsck
+Open Ports and Listening Services (TCP/UDP):
+Active Internet connections (only servers)
+Proto Recv-Q Send-Q Local Address           Foreign Address         State       PID/Program name    
+tcp        0      0 127.0.0.1:2019          0.0.0.0:*               LISTEN      1141/caddy
+tcp        0      0 0.0.0.0:22              0.0.0.0:*               LISTEN      1246/dropbear
+tcp        0      0 :::5000                 :::*                    LISTEN      1304/nocturned
+tcp        0      0 :::22                   :::*                    LISTEN      1246/dropbear
+tcp        0      0 :::3000                 :::*                    LISTEN      1141/caddy
+
+--- 3. File System Layout (Top-level directories) ---
+Root Directory Contents:
+bin/
+boot/
+data/
+dev/
+etc/
+home/
+lib/
+lost+found/
+media/
+mnt/
+opt/
+proc/
+root/
+run/
+sbin/
+srv/
+sys/
+tmp/
+uboot/
+usr/
+var/
+Configuration Directory Contents (/etc):
+NetworkManager/
+acpi/
+alpine-release
+alsa/
+apk/
+bluetooth/
+busybox-paths.d/
+ca-certificates/
+ca-certificates.conf
+caddy/
+chromium/
+conf.d/
+crontabs/
+dbus-1/
+dropbear@
+e2scrub.conf
+environment
+fonts/
+fstab
+group
+group-
+gtk-3.0/
+hostname@
+hostname.alpine-builder
+hosts
+init.d/
+inittab
+inputrc
+issue
+lbu/
+local.d/
+localtime@
+logrotate.d/
+machine-id
+mdev.conf
+mke2fs.conf
+mkinitfs/
+modprobe.d/
+modules
+modules-load.d/
+motd
+mtab@
+network/
+nocturne/
+nsswitch.conf
+opt/
+os-release@
+pam.d/
+passwd
+passwd-
+periodic/
+pkcs11/
+profile
+profile.d/
+protocols
+pulse/
+rc.conf
+resolv.conf@
+runlevels/
+secfixes.d/
+securetty
+security/
+services
+shadow@
+shadow-
+shadow.alpine-builder
+shells
+ssl/
+ssl1.1/
+sysctl.conf
+sysctl.d/
+terminfo/
+timezone@
+timezone.alpine-builder
+udev/
+udhcpc/
+vdpau_wrapper.cfg
+weston/
+xdg/
+Variable Data Directory Contents (/var):
+cache/
+empty/
+lib/
+local/
+lock@
+log/
+mail/
+opt/
+run@
+spool/
+tmp/
+Optional Software Directory Contents (/opt):
+User Binaries/Libraries Directory Contents (/usr):
+aarch64-alpine-linux-musl/
+bin/
+include/
+lib/
+libexec/
+local/
+sbin/
+share/
+
+--- 4. Log Files ---
+Log Directory Contents (/var/log):
+Last 20 lines of system log (if available):
+Last 20 lines of dmesg (kernel ring buffer):
+[ 6738.917614] fb: unsupport fmt:0
+[ 6739.017926] fb: unsupport fmt:0
+[ 6739.113288] fb: unsupport fmt:0
+[ 6739.215576] fb: unsupport fmt:0
+[ 6739.317741] fb: unsupport fmt:0
+[ 6739.427196] fb: unsupport fmt:0
+[ 6739.526803] fb: unsupport fmt:0
+[ 6739.617039] fb: unsupport fmt:0
+[ 6739.714632] fb: unsupport fmt:0
+[ 6739.839823] fb: unsupport fmt:0
+[ 6739.927708] fb: unsupport fmt:0
+[ 6740.027285] fb: unsupport fmt:0
+[ 6740.118721] fb: unsupport fmt:0
+[ 6740.215319] fb: unsupport fmt:0
+[ 6740.223435] dropbear[2715]: Child connection from 172.16.42.1:36942
+[ 6740.311368] fb: unsupport fmt:0
+[ 6740.337890] dropbear[2715]: Password auth succeeded for 'root' from 172.16.42.1:36942
+[ 6740.422413] fb: unsupport fmt:0
+[ 6740.514166] fb: unsupport fmt:0
+[ 6740.615019] fb: unsupport fmt:0
+
+--- 5. Init/Startup Files ---
+Init.d scripts (SysVinit style):
+ab_root*
+acpid*
+agetty*
+alsa*
+binfmt*
+bluealsa*
+bluetooth*
+bluetooth_adapter*
+bootmisc*
+caddy*
+cgroups*
+consolefont*
+crond*
+data_prepare*
+dbus*
+devfs*
+dmesg*
+dropbear*
+firstboot*
+fsck*
+functions.sh@
+hostname*
+hwclock*
+hwdrivers*
+killprocs*
+klogd*
+loadkmap*
+local*
+localmount*
+loopback*
+machine-id*
+mdev*
+modloop*
+modules*
+mount-ro*
+mtab*
+net-online*
+netmount*
+network-bridge*
+networking*
+networkmanager*
+networkmanager-dispatcher*
+nocturned*
+ntpd*
+numlock*
+osclock*
+procfs*
+rdate*
+rfcomm*
+rfkill*
+rngd*
+root*
+runsvdir*
+s6-svscan*
+save-keymaps*
+save-termencoding*
+savecache*
+seatd*
+seedrng*
+staticroute*
+superbird_init*
+swap*
+swclock*
+sysctl*
+sysfs*
+sysfsconf*
+syslog*
+termencoding*
+udev*
+udev-postmount*
+udev-settle*
+udev-trigger*
+watchdog*
+weston*
+Runlevel directories (OpenRC style):
+boot/
+default/
+nonetwork/
+shutdown/
+sysinit/
+Crontab entries (root):
+# do daily/weekly/monthly maintenance
+# min	hour	day	month	weekday	command
+*/15	*	*	*	*	run-parts /etc/periodic/15min
+0	*	*	*	*	run-parts /etc/periodic/hourly
+0	2	*	*	*	run-parts /etc/periodic/daily
+0	3	*	*	6	run-parts /etc/periodic/weekly
+0	5	1	*	*	run-parts /etc/periodic/monthly
+
+Startup scripts for X (if graphical environment):
+Xinit scripts not found.
+
+--- 6. User Information ---
+User Accounts (from /etc/passwd, first 20 lines):
+root:x:0:0:root:/root:/bin/sh
+bin:x:1:1:bin:/bin:/sbin/nologin
+daemon:x:2:2:daemon:/sbin:/sbin/nologin
+lp:x:4:7:lp:/var/spool/lpd:/sbin/nologin
+sync:x:5:0:sync:/sbin:/bin/sync
+shutdown:x:6:0:shutdown:/sbin:/sbin/shutdown
+halt:x:7:0:halt:/sbin:/sbin/halt
+mail:x:8:12:mail:/var/mail:/sbin/nologin
+news:x:9:13:news:/usr/lib/news:/sbin/nologin
+uucp:x:10:14:uucp:/var/spool/uucppublic:/sbin/nologin
+cron:x:16:16:cron:/var/spool/cron:/sbin/nologin
+ftp:x:21:21::/var/lib/ftp:/sbin/nologin
+sshd:x:22:22:sshd:/dev/null:/sbin/nologin
+games:x:35:35:games:/usr/games:/sbin/nologin
+ntp:x:123:123:NTP:/var/empty:/sbin/nologin
+guest:x:405:100:guest:/dev/null:/sbin/nologin
+nobody:x:65534:65534:nobody:/:/sbin/nologin
+klogd:x:100:101:klogd:/dev/null:/sbin/nologin
+rngd:x:101:102:rngd:/dev/null:/sbin/nologin
+messagebus:x:102:103:messagebus:/dev/null:/sbin/nologin
+Home Directories:
+
+--- 7. Network Configuration ---
+Network Interfaces:
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN qlen 1
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: tunl0@NONE: <NOARP> mtu 1480 qdisc noop state DOWN qlen 1
+    link/ipip 0.0.0.0 brd 0.0.0.0
+3: ip_vti0@NONE: <NOARP> mtu 1480 qdisc noop state DOWN qlen 1
+    link/ipip 0.0.0.0 brd 0.0.0.0
+4: ip6_vti0@NONE: <NOARP> mtu 1500 qdisc noop state DOWN qlen 1
+    link/tunnel6 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00 brd 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00
+5: sit0@NONE: <NOARP> mtu 1480 qdisc noop state DOWN qlen 1
+    link/sit 0.0.0.0 brd 0.0.0.0
+6: ip6tnl0@NONE: <NOARP> mtu 1452 qdisc noop state DOWN qlen 1
+    link/tunnel6 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00 brd 00:00:00:00:00:00:00:00:00:00:00:00:00:00:00:00
+7: usb0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP qlen 1000
+    link/ether fe:51:14:4b:24:ec brd ff:ff:ff:ff:ff:ff
+    inet 172.16.42.2/24 brd 172.16.42.255 scope global noprefixroute usb0
+       valid_lft forever preferred_lft forever
+    inet6 fe80::44e3:9ab0:7da6:b0cd/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+8: br0: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc noqueue state UNKNOWN qlen 1000
+    link/ether e2:ef:44:fd:3a:ea brd ff:ff:ff:ff:ff:ff
+    inet6 fe80::e0ef:44ff:fefd:3aea/64 scope link 
+       valid_lft forever preferred_lft forever
+Routing Table:
+default via 172.16.42.1 dev usb0  metric 100 
+172.16.42.0/24 dev usb0 scope link  src 172.16.42.2  metric 100 
+DNS Resolvers (/etc/resolv.conf):
+# Generated by NetworkManager
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+
+--- 8. Installed Packages (Alpine Linux specific) ---
+List of installed packages (first 20 lines):
+acl-libs
+agetty
+agetty-openrc
+alpine-base
+alpine-baselayout
+alpine-baselayout-data
+alpine-conf
+alpine-keys
+alpine-release
+alsa-lib
+alsa-ucm-conf
+alsa-utils
+alsa-utils-openrc
+aom-libs
+apk-tools
+at-spi2-core
+avahi-libs
+binutils
+blkid
+bluez
+
+--- 9. Environment Variables (first 20 lines) ---
+USER=root
+SSH_CLIENT=172.16.42.1 36942 22
+SHLVL=2
+HOME=/root
+LOGNAME=root
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+SHELL=/bin/sh
+PWD=/root
+SSH_CONNECTION=172.16.42.1 36942 172.16.42.2 22
+
+--- End of System Information Map ---
