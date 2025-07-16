@@ -39,8 +39,9 @@ export const useLocalMedia = () => {
 
   const [isConnected, setIsConnected] = useState(false);
   const [mediaState, setMediaState] = useState(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true); // Start as loading
   const [error, setError] = useState(null);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   // --- State for smooth, client-side UI updates ---
   const [clientPosition, setClientPosition] = useState(0);
@@ -57,7 +58,7 @@ export const useLocalMedia = () => {
 
   // --- Server Communication ---
   const sendCommand = useCallback(async (command, params = {}) => {
-    setLoading(true);
+    // Don't show loading indicator for commands - it causes the dots to appear
     try {
       let endpoint = `/media/${command}`;
       if (command === 'seek' && params.positionMs !== undefined) {
@@ -69,8 +70,6 @@ export const useLocalMedia = () => {
     } catch (err) {
       console.error(`Error sending ${command} command:`, err);
       setError(err.message);
-    } finally {
-      setLoading(false);
     }
   }, [apiRequest]);
 
@@ -133,17 +132,27 @@ export const useLocalMedia = () => {
   useEffect(() => {
     const listenerId = addMessageListener('local-media', handleWsMessage);
     // Initial status check
-    apiRequest('/media/status').then(status => {
-      if (status) {
-        setIsConnected(status.connected);
-        if (status.state) {
-          setMediaState(status.state);
-          setClientPosition(status.state.position_ms || 0);
-          lastServerStateRef.current = status.state;
-          lastClientUpdateRef.current = Date.now();
+    apiRequest('/media/status')
+      .then(status => {
+        if (status) {
+          setIsConnected(status.connected);
+          if (status.state) {
+            setMediaState(status.state);
+            setClientPosition(status.state.position_ms || 0);
+            lastServerStateRef.current = status.state;
+            lastClientUpdateRef.current = Date.now();
+          }
         }
-      }
-    });
+        setInitialLoadComplete(true);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error('Failed to get initial media status:', err);
+        setError('Failed to connect to media service');
+        setInitialLoadComplete(true);
+        setLoading(false);
+      });
+    
     return () => removeMessageListener(listenerId);
   }, [apiRequest, addMessageListener, removeMessageListener, handleWsMessage]);
 
@@ -180,6 +189,29 @@ export const useLocalMedia = () => {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }, []);
 
+  // Manual status check function
+  const checkMediaStatus = useCallback(async () => {
+    setLoading(true);
+    try {
+      const status = await apiRequest('/media/status');
+      if (status) {
+        setIsConnected(status.connected);
+        if (status.state) {
+          setMediaState(status.state);
+          setClientPosition(status.state.position_ms || 0);
+          lastServerStateRef.current = status.state;
+          lastClientUpdateRef.current = Date.now();
+        }
+      }
+      setError(null);
+    } catch (err) {
+      console.error('Failed to check media status:', err);
+      setError('Failed to connect to media service');
+    } finally {
+      setLoading(false);
+    }
+  }, [apiRequest]);
+
   return {
     isConnected, wsConnected, loading, error,
     currentTrack: mediaState?.track,
@@ -190,5 +222,7 @@ export const useLocalMedia = () => {
     volume,
     togglePlayPause, next, previous, seekTo, setVolume,
     formatTime,
+    checkMediaStatus,
+    initialLoadComplete,
   };
 };
