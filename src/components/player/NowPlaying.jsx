@@ -212,7 +212,9 @@ export default function NowPlaying({
     const artistName = currentPlayback?.item
       ? currentPlayback.item.type === "episode"
         ? currentPlayback.item.show.name
-        : currentPlayback.item.artists.map((artist) => artist.name).join(", ")
+        : currentPlayback.item.artists
+        ? currentPlayback.item.artists.map((artist) => artist.name).join(", ")
+        : currentPlayback.item.artist || ""
       : "";
 
     const firstArtistId =
