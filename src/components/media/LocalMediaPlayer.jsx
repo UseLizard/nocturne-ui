@@ -141,7 +141,7 @@ const LocalMediaProgressBar = ({
   );
 };
 
-const LocalMediaPlayer = ({ className = "", onClose }) => {
+const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => {
   const containerRef = useRef(null);
   const contentContainerRef = useRef(null);
   const [volumeOverlayState, setVolumeOverlayState] = useState({
@@ -165,6 +165,7 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     duration,
     position,
     volume,
+    albumArtUrl,
     togglePlayPause,
     next,
     previous,
@@ -304,6 +305,17 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     };
   }, []);
 
+  // Update gradient when album art changes or track changes
+  useEffect(() => {
+    if (updateGradientColors && albumArtUrl) {
+      // Force refresh with cache busting to ensure gradient updates
+      const urlWithCacheBust = albumArtUrl.includes('?') 
+        ? `${albumArtUrl}&track=${encodeURIComponent(currentTrack || '')}`
+        : `${albumArtUrl}?track=${encodeURIComponent(currentTrack || '')}`;
+      updateGradientColors(urlWithCacheBust, "media");
+    }
+  }, [albumArtUrl, currentTrack, updateGradientColors]);
+
   // Unified scroll wheel for volume control (SPP mode)
   const { manualVolumeChangeRef } = useMediaScrollWheel({
     containerRef,
@@ -361,10 +373,28 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
         {/* Album Art - Blank Square */}
         <div className="min-w-[280px] mr-8">
           <div
-            className="aspect-square rounded-[12px] drop-shadow-[0_8px_5px_rgba(0,0,0,0.25)] bg-white/10 flex items-center justify-center"
+            className="aspect-square rounded-[12px] drop-shadow-[0_8px_5px_rgba(0,0,0,0.25)] bg-white/10 flex items-center justify-center overflow-hidden"
             style={{ width: 280, height: 280 }}
           >
-            {!wsConnected ? (
+            {/* Debug info */}
+            {false && albumArtUrl && (
+              <div className="absolute top-0 left-0 bg-black/80 text-white text-xs p-2">
+                <div>URL: {albumArtUrl}</div>
+                <div>Connected: {isConnected ? 'Yes' : 'No'}</div>
+                <div>Track: {currentTrack || 'None'}</div>
+              </div>
+            )}
+            {albumArtUrl && isConnected && currentTrack ? (
+              <img 
+                src={albumArtUrl} 
+                alt={`${currentAlbum || currentTrack} album art`}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  // Hide image on error to show fallback
+                  e.target.style.display = 'none';
+                }}
+              />
+            ) : !wsConnected ? (
               <div className="text-center">
                 <div className="text-red-400 text-sm mb-2">WebSocket Disconnected</div>
                 <button 
@@ -427,24 +457,34 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
               pixelsPerSecond={40}
             />
           </div>
-          <h4 className="text-[36px] font-[560] text-white/60 tracking-tight max-w-[380px]">
-            {/* This block will only render when mediaMode is 'song' and a track is playing */}
-            {mediaMode === 'song' && currentTrack && (
-              <>
-                <div className="truncate">{currentAlbum || 'Unknown Album'}</div>
-                <div className="text-[28px] font-[500] text-white/50 mt-1 truncate">
-                  {currentArtist || 'Unknown Artist'}
-                </div>
-              </>
-            )}
-            
-            {/* This block will render for 'podcast' mode OR if no track is playing */}
-            {(mediaMode === 'podcast' || !currentTrack) && (
-              <div className="text-[28px] font-[500] text-white/50 mt-1 truncate">
-                {currentArtist || (isConnected ? "Start playing music on your Android device" : "Pair your Android device")}
-              </div>
-            )}
-          </h4>
+          {/* Debug info */}
+          {false && (
+            <div className="text-xs text-white/40 mt-2">
+              <div>Mode: {mediaMode}</div>
+              <div>Track: {currentTrack || 'null'}</div>
+              <div>Artist: {currentArtist || 'null'}</div>
+              <div>Album: {currentAlbum || 'null'}</div>
+              <div>Duration: {duration}ms</div>
+            </div>
+          )}
+          {/* Song mode - show album and artist */}
+          {mediaMode === 'song' && currentTrack && (
+            <>
+              <h4 className="text-[36px] font-[560] text-white/60 tracking-tight max-w-[380px] truncate">
+                {currentAlbum || 'Unknown Album'}
+              </h4>
+              <h4 className="text-[28px] font-[500] text-white/50 mt-1 tracking-tight max-w-[380px] truncate">
+                {currentArtist || 'Unknown Artist'}
+              </h4>
+            </>
+          )}
+          
+          {/* Podcast mode or no track - show artist/message only */}
+          {(mediaMode === 'podcast' || !currentTrack) && (
+            <h4 className="text-[28px] font-[500] text-white/50 mt-1 tracking-tight max-w-[380px] truncate">
+              {currentArtist || (isConnected ? "Start playing music on your Android device" : "Pair your Android device")}
+            </h4>
+          )}
           
           {/* Mode indicator */}
           {isConnected && currentTrack && (

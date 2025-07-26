@@ -4,6 +4,7 @@ import HorizontalScroll from "../components/common/navigation/HorizontalScroll";
 import Settings from "../components/settings/Settings";
 import LocalMediaPlayer from "../components/media/LocalMediaPlayer";
 import BluetoothMainBLE from "../components/bluetooth/BluetoothMainBLE";
+import AlbumArtGallery from "../components/albumart/AlbumArtGallery";
 import { useGradientState } from "../hooks/useGradientState";
 import { useNavigation } from "../hooks/useNavigation";
 import { useSpotifyPlayerControls } from "../hooks/useSpotifyPlayerControls";
@@ -71,6 +72,8 @@ export default function Home({
       updateGradientColors(null, "media");
     } else if (activeSection === "bluetooth") {
       updateGradientColors(null, "bluetooth");
+    } else if (activeSection === "albumart") {
+      updateGradientColors(null, "albumart");
     }
   }, [
     activeSection,
@@ -767,7 +770,7 @@ export default function Home({
       case "podcasts":
         return renderPodcastsSection();
       case "media":
-        return <LocalMediaPlayer onClose={() => setActiveSection("recents")} />;
+        return <LocalMediaPlayer onClose={() => setActiveSection("recents")} updateGradientColors={updateGradientColors} />;
       case "settings":
         return (
           <Settings
@@ -778,6 +781,8 @@ export default function Home({
         );
       case "bluetooth":
         return <BluetoothMainBLE setActiveSection={setActiveSection} />;
+      case "albumart":
+        return <AlbumArtGallery setActiveSection={setActiveSection} />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-white/50 text-2xl">
@@ -787,8 +792,8 @@ export default function Home({
     }
   };
 
-  // Render media and bluetooth sections as full-screen like NowPlaying
-  if (activeSection === "media" || activeSection === "bluetooth") {
+  // Render media, bluetooth, and albumart sections as full-screen like NowPlaying
+  if (activeSection === "media" || activeSection === "bluetooth" || activeSection === "albumart") {
     return (
       <div className="relative min-h-screen">
         {renderContent()}

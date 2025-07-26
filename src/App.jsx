@@ -512,7 +512,11 @@ function App() {
       if (activeSection === "recents" || activeSection === "nowPlaying") {
         updateGradientColors("/images/not-playing.webp", activeSection);
       }
+    } else if (activeSection === "media") {
+      // For local media player, use the album art if available
+      updateGradientColors("http://localhost:5000/api/albumart", "media");
     }
+    // Note: media section gradient is now handled by LocalMediaPlayer component
   }, [currentlyPlayingAlbum, activeSection, updateGradientColors]);
 
   const handleAuthSuccess = () => {

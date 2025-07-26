@@ -42,6 +42,7 @@ export const useLocalMedia = () => {
   const [loading, setLoading] = useState(true); // Start as loading
   const [error, setError] = useState(null);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const [albumArtUrl, setAlbumArtUrl] = useState(null);
 
   // --- State for smooth, client-side UI updates ---
   const [clientPosition, setClientPosition] = useState(0);
@@ -102,6 +103,7 @@ export const useLocalMedia = () => {
     } else if (data.type === 'media/disconnected') {
       setIsConnected(false);
       setMediaState(null);
+      setAlbumArtUrl(null);
     } else if (data.type === 'media/state_update') {
       const serverState = data.payload;
       const isTrackChange = lastServerStateRef.current?.track !== serverState.track;
@@ -123,8 +125,19 @@ export const useLocalMedia = () => {
       if (isTrackChange || !isSeekingRef.current) {
         setClientPosition(serverState.position_ms || 0);
       }
+      
+      // Clear album art on track change to show loading state
+      if (isTrackChange) {
+        setAlbumArtUrl(null);
+      }
 
       // Volume sync is handled by the clientVolume reset timer
+    } else if (data.type === 'media/album_art_updated') {
+      // Album art has been received and saved
+      const { filename, track_id } = data.payload;
+      console.log('Album art updated:', filename, track_id);
+      // Update the album art URL with cache busting to ensure fresh image
+      setAlbumArtUrl(`http://localhost:5000/api/albumart?t=${Date.now()}`);
     }
   }, []);
 
@@ -141,6 +154,11 @@ export const useLocalMedia = () => {
             setClientPosition(status.state.position_ms || 0);
             lastServerStateRef.current = status.state;
             lastClientUpdateRef.current = Date.now();
+          }
+          // Check if album art exists on initial load
+          if (status.connected && status.state?.track) {
+            // Try to load album art if we have a track
+            setAlbumArtUrl('http://localhost:5000/api/albumart');
           }
         }
         setInitialLoadComplete(true);
@@ -220,6 +238,7 @@ export const useLocalMedia = () => {
     isPlaying, duration,
     position: clientPosition,
     volume,
+    albumArtUrl,
     togglePlayPause, next, previous, seekTo, setVolume,
     formatTime,
     checkMediaStatus,
