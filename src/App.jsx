@@ -13,7 +13,7 @@ import ConnectorQRModal from "./components/common/modals/ConnectorQRModal";
 import SystemUpdateModal from "./components/common/modals/SystemUpdateModal";
 import ButtonMappingOverlay from "./components/common/overlays/ButtonMappingOverlay";
 import NetworkBanner from "./components/common/overlays/NetworkBanner";
-import BrightnessOverlay from "./components/common/overlays/BrightnessOverlay";
+import PowerMenu from "./components/common/overlays/PowerMenu";
 import GradientBackground from "./components/common/GradientBackground";
 import { useNetwork } from "./hooks/useNetwork";
 import { useGradientState } from "./hooks/useGradientState";
@@ -276,8 +276,7 @@ function App() {
   const [isDeviceSwitcherOpen, setIsDeviceSwitcherOpen] = useState(false);
   const [selectedNetwork, setSelectedNetwork] = useState(null);
   const [showConnectorModal, setShowConnectorModal] = useState(false);
-  const [brightness, setBrightness] = useState(160);
-  const [showBrightnessOverlay, setShowBrightnessOverlay] = useState(false);
+  const [showPowerMenu, setShowPowerMenu] = useState(false);
   const [playbackIntentOnDeviceSwitch, setPlaybackIntentOnDeviceSwitch] = useState(null);
 
   useEffect(() => {
@@ -289,28 +288,22 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const handleBrightnessKeyDown = (e) => {
-      if (showTutorial || (e.key.toLowerCase() === 'm' && !showBrightnessOverlay)) {
+    const handlePowerMenuKeyDown = (e) => {
+      if (showTutorial || (e.key.toLowerCase() === 'm' && !showPowerMenu)) {
         e.preventDefault();
         e.stopPropagation();
-        if (e.key.toLowerCase() === 'm' && !showBrightnessOverlay && !showTutorial) {
-          setShowBrightnessOverlay(true);
+        if (e.key.toLowerCase() === 'm' && !showPowerMenu && !showTutorial) {
+          setShowPowerMenu(true);
         }
       }
     };
 
-    const handleOverlayDismiss = () => {
-      setShowBrightnessOverlay(false);
-    };
-
-    document.addEventListener('keydown', handleBrightnessKeyDown, { capture: true });
-    window.addEventListener('brightness-overlay-dismiss', handleOverlayDismiss);
+    document.addEventListener('keydown', handlePowerMenuKeyDown, { capture: true });
 
     return () => {
-      document.removeEventListener('keydown', handleBrightnessKeyDown, { capture: true });
-      window.removeEventListener('brightness-overlay-dismiss', handleOverlayDismiss);
+      document.removeEventListener('keydown', handlePowerMenuKeyDown, { capture: true });
     };
-  }, [showBrightnessOverlay, showTutorial]);
+  }, [showPowerMenu, showTutorial]);
 
   const {
     isAuthenticated,
@@ -727,11 +720,9 @@ function App() {
                         activeButton={globalActiveButton}
                       />
                     )}
-                    <BrightnessOverlay
-                      isVisible={showBrightnessOverlay}
-                      brightness={brightness}
-                      onBrightnessChange={setBrightness}
-                      onDismiss={() => setShowBrightnessOverlay(false)}
+                    <PowerMenu
+                      isVisible={showPowerMenu}
+                      onClose={() => setShowPowerMenu(false)}
                     />
                   </div>
                 </main>
