@@ -121,6 +121,14 @@ const setupGlobalWebSocket = async () => {
       console.log('Disconnected from WebSocket');
       globalWsListeners.forEach(listener => listener.onClose && listener.onClose());
       globalWsRef = null;
+      
+      // Attempt to reconnect after a delay
+      setTimeout(() => {
+        console.log('Attempting to reconnect WebSocket...');
+        if (!globalWsRef && globalWsListeners.length > 0) {
+          setupGlobalWebSocket();
+        }
+      }, 3000); // Wait 3 seconds before reconnecting
     };
 
     socket.onmessage = (event) => {

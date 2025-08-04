@@ -5,6 +5,7 @@ import Settings from "../components/settings/Settings";
 import LocalMediaPlayer from "../components/media/LocalMediaPlayer";
 import BluetoothMainBLE from "../components/bluetooth/BluetoothMainBLE";
 import AlbumArtGallery from "../components/albumart/AlbumArtGallery";
+import AlbumArtTest from "../components/AlbumArtTest";
 import { useGradientState } from "../hooks/useGradientState";
 import { useNavigation } from "../hooks/useNavigation";
 import { useSpotifyPlayerControls } from "../hooks/useSpotifyPlayerControls";
@@ -783,6 +784,8 @@ export default function Home({
         return <BluetoothMainBLE setActiveSection={setActiveSection} />;
       case "albumart":
         return <AlbumArtGallery setActiveSection={setActiveSection} />;
+      case "test":
+        return <AlbumArtTest />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-white/50 text-2xl">
@@ -792,8 +795,8 @@ export default function Home({
     }
   };
 
-  // Render media, bluetooth, and albumart sections as full-screen like NowPlaying
-  if (activeSection === "media" || activeSection === "bluetooth" || activeSection === "albumart") {
+  // Render media, bluetooth, albumart, and test sections as full-screen like NowPlaying
+  if (activeSection === "media" || activeSection === "bluetooth" || activeSection === "albumart" || activeSection === "test") {
     return (
       <div className="relative min-h-screen">
         {renderContent()}

@@ -23,7 +23,7 @@ const AlbumArtGallery = ({ setActiveSection }) => {
     try {
       setLoading(true);
       // Fetch the list of available album art from the API
-      const response = await fetch('http://172.16.42.2:5000/api/albumart', {
+      const response = await fetch('http://localhost:5000/api/albumart', {
         headers: {
           'Accept': 'application/json'
         }
@@ -97,7 +97,7 @@ const AlbumArtGallery = ({ setActiveSection }) => {
               >
                 <div className="aspect-square rounded-[12px] overflow-hidden drop-shadow-[0_8px_5px_rgba(0,0,0,0.25)] hover:scale-105 transition-transform relative">
                   <img
-                    src={`http://172.16.42.2:5000/api/albumart/${item.filename || item}`}
+                    src={`http://localhost:5000/api/albumart/${item.filename}`}
                     alt={`${item.album || 'Album art'} ${index + 1}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {

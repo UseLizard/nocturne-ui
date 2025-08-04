@@ -305,16 +305,8 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     };
   }, []);
 
-  // Update gradient when album art changes or track changes
-  useEffect(() => {
-    if (updateGradientColors && albumArtUrl) {
-      // Force refresh with cache busting to ensure gradient updates
-      const urlWithCacheBust = albumArtUrl.includes('?') 
-        ? `${albumArtUrl}&track=${encodeURIComponent(currentTrack || '')}`
-        : `${albumArtUrl}?track=${encodeURIComponent(currentTrack || '')}`;
-      updateGradientColors(urlWithCacheBust, "media");
-    }
-  }, [albumArtUrl, currentTrack, updateGradientColors]);
+  // Note: Gradient update is now handled in the image onLoad handler
+  // This ensures the gradient is only updated when the image actually loads
 
   // Unified scroll wheel for volume control (SPP mode)
   const { manualVolumeChangeRef } = useMediaScrollWheel({
@@ -384,11 +376,17 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
                 <div>Track: {currentTrack || 'None'}</div>
               </div>
             )}
-            {albumArtUrl && isConnected && currentTrack ? (
+            {albumArtUrl && isConnected ? (
               <img 
                 src={albumArtUrl} 
                 alt={`${currentAlbum || currentTrack} album art`}
                 className="w-full h-full object-cover"
+                onLoad={(e) => {
+                  // Update gradient colors when image loads
+                  if (updateGradientColors) {
+                    updateGradientColors(e.target.src, "media");
+                  }
+                }}
                 onError={(e) => {
                   // Hide image on error to show fallback
                   e.target.style.display = 'none';
@@ -543,21 +541,6 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
 
         {/* Playback Controls - Enhanced based on mode */}
         <div className="flex justify-center items-center flex-1">
-          {/* Previous Track Button - Always visible */}
-          <div 
-            onClick={handleSkipPrevious} 
-            className="mx-6 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
-            style={{ 
-              WebkitAppearance: 'none', 
-              MozAppearance: 'none', 
-              WebkitTapHighlightColor: 'transparent',
-              opacity: loading || !isConnected ? 0.5 : 1,
-              pointerEvents: loading || !isConnected ? 'none' : 'auto'
-            }}
-          >
-            <BackIcon className="w-14 h-14" />
-          </div>
-
           {/* Skip Backward 30s - Always visible with proper styling */}
           <div 
             onClick={handleSkipBackward30s} 
@@ -578,7 +561,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
           {/* Play/Pause Button */}
           <div
             onClick={handlePlayPause}
-            className="transition-opacity duration-100 mx-6 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
+            className="transition-opacity duration-100 mx-12 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
             style={{ 
               WebkitAppearance: 'none', 
               MozAppearance: 'none', 
@@ -605,21 +588,6 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
             <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
               <span className="text-white text-sm font-bold">+30</span>
             </div>
-          </div>
-          
-          {/* Next Track Button - Always visible */}
-          <div 
-            onClick={handleSkipNext} 
-            className="mx-6 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
-            style={{ 
-              WebkitAppearance: 'none', 
-              MozAppearance: 'none', 
-              WebkitTapHighlightColor: 'transparent',
-              opacity: loading || !isConnected ? 0.5 : 1,
-              pointerEvents: loading || !isConnected ? 'none' : 'auto'
-            }}
-          >
-            <ForwardIcon className="w-14 h-14" />
           </div>
         </div>
 

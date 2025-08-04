@@ -30,11 +30,12 @@ function PowerMenu({ isVisible, onClose }) {
   const [errorStatus, setErrorStatus] = useState("");
 
   useEffect(() => {
+    if (!isVisible) return;
+    
     const handleKeyPress = (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      
       if (e.key === 'Escape' || e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        e.stopPropagation();
         onClose();
       }
     };
@@ -43,7 +44,7 @@ function PowerMenu({ isVisible, onClose }) {
     return () => {
       document.removeEventListener('keydown', handleKeyPress, { capture: true });
     };
-  }, [onClose]);
+  }, [isVisible, onClose]);
 
   const handleBluetoothReconnect = async () => {
     if (isReconnecting) return;
@@ -59,10 +60,14 @@ function PowerMenu({ isVisible, onClose }) {
       }
       
       setSuccessStatus("Waiting...");
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      await new Promise(resolve => setTimeout(resolve, 3000));
       
       setSuccessStatus("Reconnecting...");
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      const connectResponse = await fetch('http://localhost:5000/media/ble/connect', { method: 'POST' });
+      
+      if (!connectResponse.ok) {
+        throw new Error('Failed to reconnect');
+      }
       
       setSuccessStatus("Complete!");
       setTimeout(() => {
@@ -98,6 +103,29 @@ function PowerMenu({ isVisible, onClose }) {
     } catch (error) {
       console.error('Time sync error:', error);
       setErrorStatus("Time sync failed");
+      setTimeout(() => {
+        setErrorStatus("");
+      }, 3000);
+    }
+  };
+  
+  const handleTrackRefresh = async () => {
+    try {
+      const response = await fetch('http://localhost:5000/api/track/refresh', { method: 'POST' });
+      
+      if (!response.ok) {
+        throw new Error('Failed to refresh track data');
+      }
+      
+      setSuccessStatus("Track data refreshed!");
+      setTimeout(() => {
+        setSuccessStatus("");
+        onClose();
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Track refresh error:', error);
+      setErrorStatus("Track refresh failed");
       setTimeout(() => {
         setErrorStatus("");
       }, 3000);
@@ -140,6 +168,11 @@ function PowerMenu({ isVisible, onClose }) {
             <MenuItem 
               text="Sync Time"
               onClick={handleTimeSync}
+              disabled={isReconnecting}
+            />
+            <MenuItem 
+              text="Refresh Track Data"
+              onClick={handleTrackRefresh}
               disabled={isReconnecting}
             />
             <MenuItem 

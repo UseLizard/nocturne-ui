@@ -34,6 +34,7 @@ const debounce = (func, delay) => {
   };
 };
 
+
 export const useLocalMedia = () => {
   const { wsConnected, apiRequest, addMessageListener, removeMessageListener } = useNocturned();
 
@@ -134,9 +135,17 @@ export const useLocalMedia = () => {
       // Volume sync is handled by the clientVolume reset timer
     } else if (data.type === 'media/album_art_updated') {
       // Album art has been received and saved
-      const { filename, track_id } = data.payload;
+      const { filename, track_id, artist, album } = data.payload;
       console.log('Album art updated:', filename, track_id);
-      // Update the album art URL with cache busting to ensure fresh image
+      
+      // Always use the current album art endpoint with cache busting
+      setAlbumArtUrl(`http://localhost:5000/api/albumart?t=${Date.now()}`);
+    } else if (data.type === 'media/album_art_cached') {
+      // Album art is already cached, but still use the current endpoint
+      const { artist, album } = data.payload;
+      console.log('Album art cached:', artist, album);
+      
+      // Use the current album art endpoint with cache busting
       setAlbumArtUrl(`http://localhost:5000/api/albumart?t=${Date.now()}`);
     }
   }, []);
@@ -155,10 +164,9 @@ export const useLocalMedia = () => {
             lastServerStateRef.current = status.state;
             lastClientUpdateRef.current = Date.now();
           }
-          // Check if album art exists on initial load
-          if (status.connected && status.state?.track) {
-            // Try to load album art if we have a track
-            setAlbumArtUrl('http://localhost:5000/api/albumart');
+          // If connected and we have media info, set album art URL
+          if (status.connected && status.state && (status.state.artist || status.state.album || status.state.track)) {
+            setAlbumArtUrl(`http://localhost:5000/api/albumart?t=${Date.now()}`);
           }
         }
         setInitialLoadComplete(true);

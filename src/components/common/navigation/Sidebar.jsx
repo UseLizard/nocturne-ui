@@ -55,6 +55,7 @@ export default function Sidebar({ activeSection, setActiveSection }) {
       <SidebarItem section="podcasts" icon={PodcastIcon} label="Podcasts" />
       <SidebarItem section="settings" icon={SettingsIcon} label="Settings" />
       <SidebarItem section="bluetooth" icon={BluetoothIcon} label="Bluetooth" />
+      <SidebarItem section="test" icon={SettingsIcon} label="Test" />
     </div>
   );
 }
