@@ -4,6 +4,7 @@ import { useNavigation } from '../../hooks/useNavigation';
 import { useMediaScrollWheel } from '../../hooks/useScrollWheel';
 import { useGestureControls } from '../../hooks/useGestureControls';
 import ScrollingText from '../common/ScrollingText';
+import DoubleBufferedImage from '../common/DoubleBufferedImage';
 import {
   BluetoothIcon,
   SmartphoneIcon,
@@ -376,9 +377,9 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
                 <div>Track: {currentTrack || 'None'}</div>
               </div>
             )}
-            {albumArtUrl && isConnected ? (
-              <img 
-                src={albumArtUrl} 
+            {isConnected ? (
+              <DoubleBufferedImage
+                src={albumArtUrl}
                 alt={`${currentAlbum || currentTrack} album art`}
                 className="w-full h-full object-cover"
                 onLoad={(e) => {
@@ -387,10 +388,13 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
                     updateGradientColors(e.target.src, "media");
                   }
                 }}
-                onError={(e) => {
-                  // Hide image on error to show fallback
-                  e.target.style.display = 'none';
-                }}
+                fallback={
+                  <div className="text-center">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mb-2"></div>
+                    <div className="text-green-300 text-xs">Android Connected</div>
+                  </div>
+                }
+                transitionDuration={500}
               />
             ) : !wsConnected ? (
               <div className="text-center">

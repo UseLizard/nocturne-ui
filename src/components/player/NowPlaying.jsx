@@ -8,6 +8,7 @@ import { useElapsedTime } from "../../hooks/useElapsedTime";
 import { useMediaScrollWheel } from "../../hooks/useScrollWheel";
 import ProgressBar from "./ProgressBar";
 import ScrollingText from "../common/ScrollingText";
+import DoubleBufferedImage from "../common/DoubleBufferedImage";
 import {
   HeartIcon,
   HeartIconFilled,
@@ -466,17 +467,27 @@ export default function NowPlaying({
       <div ref={contentContainerRef}>
         <div className="md:w-1/3 flex flex-row items-center px-12 pt-10">
           <div className={`min-w-[280px] mr-8 ${albumId ? 'cursor-pointer' : ''}`} onClick={() => albumId && onNavigateToAlbum && onNavigateToAlbum(albumId, "album")}>
-            <img
-              src={albumArt}
-              alt={
-                currentPlayback?.item?.type === "episode"
-                  ? "Podcast Cover"
-                  : "Album Art"
-              }
-              width={280}
-              height={280}
-              className="aspect-square rounded-[12px] drop-shadow-[0_8px_5px_rgba(0,0,0,0.25)]"
-            />
+            <div className="w-[280px] h-[280px] aspect-square rounded-[12px] drop-shadow-[0_8px_5px_rgba(0,0,0,0.25)] overflow-hidden">
+              <DoubleBufferedImage
+                src={albumArt}
+                alt={
+                  currentPlayback?.item?.type === "episode"
+                    ? "Podcast Cover"
+                    : "Album Art"
+                }
+                className="w-full h-full object-cover"
+                onLoad={() => {
+                  // Update gradient colors when image loads
+                  if (updateGradientColors && albumArt) {
+                    updateGradientColors(albumArt, "nowPlaying");
+                  }
+                }}
+                fallback={
+                  <div className="w-full h-full bg-white/10 animate-pulse" />
+                }
+                transitionDuration={500}
+              />
+            </div>
           </div>
 
           {!showLyrics ? (

@@ -294,7 +294,7 @@ export function useGradientTransition(activeSection) {
   const updateGradientColors = useCallback(
     async (imageUrl, imageSection = null) => {
       const skipCacheCheck =
-        imageSection === "nowPlaying" || imageSection === "recents";
+        imageSection === "nowPlaying" || imageSection === "recents" || imageSection === "media";
       const urlSectionKey = `${imageUrl || "none"}-${imageSection || "none"}`;
 
       if (
@@ -374,7 +374,9 @@ export function useGradientTransition(activeSection) {
           !imageSection ||
           imageSection === activeSection ||
           imageSection === "nowPlaying" ||
+          imageSection === "media" ||
           (activeSection === "nowPlaying" && imageSection) ||
+          (activeSection === "media" && imageSection) ||
           ["album", "playlist", "artist", "mix", "liked-songs"].includes(imageSection)
         );
       }
