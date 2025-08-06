@@ -3,8 +3,10 @@ import { useLocalMedia } from '../../hooks/useLocalMedia';
 import { useNavigation } from '../../hooks/useNavigation';
 import { useMediaScrollWheel } from '../../hooks/useScrollWheel';
 import { useGestureControls } from '../../hooks/useGestureControls';
+import { useGradientState } from '../../hooks/useGradientState';
 import ScrollingText from '../common/ScrollingText';
 import DoubleBufferedImage from '../common/DoubleBufferedImage';
+import GradientBackground from '../common/GradientBackground';
 import {
   BluetoothIcon,
   SmartphoneIcon,
@@ -154,6 +156,9 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
   const volumeTimerRef = useRef(null);
   const volumeLastAdjustedRef = useRef(0);
   const prevVolumeRef = useRef(null);
+  
+  // Use local gradient state
+  const [gradientState, setGradientState] = useGradientState('media');
   const {
     isConnected,
     wsConnected,
@@ -252,6 +257,19 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     isActive: true,
   });
 
+  // Update local gradient state when album art changes
+  useEffect(() => {
+    if (albumArtUrl) {
+      // Update local gradient state
+      setGradientState(albumArtUrl, 'media', 0, currentTrack);
+      
+      // Also update global gradient if the callback is provided
+      if (updateGradientColors) {
+        updateGradientColors(albumArtUrl, 'media');
+      }
+    }
+  }, [albumArtUrl, currentTrack, setGradientState, updateGradientColors]);
+
   // Handle Enter key (scroll wheel button press) for play/pause
   useEffect(() => {
     const handleKeyDown = (e) => {
@@ -306,8 +324,6 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     };
   }, []);
 
-  // Note: Gradient update is now handled in the image onLoad handler
-  // This ensures the gradient is only updated when the image actually loads
 
   // Unified scroll wheel for volume control (SPP mode)
   const { manualVolumeChangeRef } = useMediaScrollWheel({
@@ -353,11 +369,15 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     );
   };
 
+
   return (
     <div 
-      className="flex flex-col justify-between h-screen w-full z-10 fadeIn-animation"
+      className="flex flex-col justify-between h-screen w-full z-10 fadeIn-animation relative"
       ref={containerRef}
     >
+      {/* Global Gradient Background */}
+      <GradientBackground gradientState={gradientState} className="absolute inset-0 -z-10 bg-black" />
+      
       {/* Main Content Area */}
       <div 
         className="md:w-1/3 flex flex-row items-center px-12 pt-10 flex-1"
@@ -382,10 +402,15 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
                 src={albumArtUrl}
                 alt={`${currentAlbum || currentTrack} album art`}
                 className="w-full h-full object-cover"
-                onLoad={(e) => {
-                  // Update gradient colors when image loads
-                  if (updateGradientColors) {
-                    updateGradientColors(e.target.src, "media");
+                onLoad={() => {
+                  // Update local gradient state when image loads
+                  if (albumArtUrl) {
+                    setGradientState(albumArtUrl, 'media', 0, currentTrack);
+                    
+                    // Also update global gradient if the callback is provided
+                    if (updateGradientColors) {
+                      updateGradientColors(albumArtUrl, 'media');
+                    }
                   }
                 }}
                 fallback={

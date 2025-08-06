@@ -6,7 +6,6 @@ import NetworkScreen from "./components/auth/NetworkScreen";
 import Tutorial from "./components/tutorial/Tutorial";
 import Home from "./pages/Home";
 import ContentView from "./components/content/ContentView";
-import NowPlaying from "./components/player/NowPlaying";
 import DeviceSwitcherModal from "./components/player/DeviceSwitcherModal";
 import NetworkPasswordModal from "./components/common/modals/NetworkPasswordModal";
 import ConnectorQRModal from "./components/common/modals/ConnectorQRModal";
@@ -195,7 +194,7 @@ function useGlobalButtonMapping({
         if (success) {
           setTimeout(() => {
             refreshPlaybackState();
-            setActiveSection("nowPlaying");
+            setActiveSection("media");
           }, 500);
         }
 
@@ -393,7 +392,7 @@ function App() {
         if (success) {
           setTimeout(() => {
             refreshPlaybackState();
-            setActiveSection("nowPlaying");
+            setActiveSection("media");
           }, 1500);
         }
         setPlaybackIntentOnDeviceSwitch(null);
@@ -464,10 +463,10 @@ function App() {
       updateGradientColors(null, "radio");
     } else if (activeSection === "settings") {
       updateGradientColors(null, "settings");
-    } else if (activeSection === "nowPlaying" && currentlyPlayingAlbum) {
+    } else if (activeSection === "media" && currentlyPlayingAlbum) {
       const albumImage = currentlyPlayingAlbum?.images?.[1]?.url;
       if (albumImage) {
-        updateGradientColors(albumImage, "nowPlaying");
+        updateGradientColors(albumImage, "media");
       }
     }
   }, [
@@ -495,22 +494,52 @@ function App() {
   }, [showTetheringScreen, enableNetworking]);
 
   useEffect(() => {
+    const fetchImageSize = async (url) => {
+      try {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return blob.size;
+      } catch (error) {
+        console.error("Error fetching image size:", error);
+        return 0;
+      }
+    };
+
     if (currentlyPlayingAlbum?.images?.[1]?.url) {
-      if (activeSection === "nowPlaying") {
-        updateGradientColors(currentlyPlayingAlbum.images[1].url, "nowPlaying");
+      if (activeSection === "media") {
+        fetchImageSize(currentlyPlayingAlbum.images[1].url).then((size) => {
+          updateGradientColors(
+            currentlyPlayingAlbum.images[1].url,
+            "media",
+            size
+          );
+        });
       } else if (activeSection === "recents") {
-        updateGradientColors(currentlyPlayingAlbum.images[1].url, "recents");
+        fetchImageSize(currentlyPlayingAlbum.images[1].url).then((size) => {
+          updateGradientColors(
+            currentlyPlayingAlbum.images[1].url,
+            "recents",
+            size
+          );
+        });
       }
     } else if (currentlyPlayingAlbum?.type === "local-track") {
-      if (activeSection === "recents" || activeSection === "nowPlaying") {
+      if (activeSection === "recents" || activeSection === "media") {
         updateGradientColors("/images/not-playing.webp", activeSection);
       }
     } else if (activeSection === "media") {
       // For local media player, use the album art if available
-      updateGradientColors("http://localhost:5000/api/albumart", "media");
+      fetchImageSize("http://localhost:5000/api/albumart").then((size) => {
+        updateGradientColors("http://localhost:5000/api/albumart", "media", size);
+      });
     }
     // Note: media section gradient is now handled by LocalMediaPlayer component
-  }, [currentlyPlayingAlbum, activeSection, updateGradientColors]);
+  }, [
+    currentlyPlayingAlbum,
+    activeSection,
+    updateGradientColors,
+    currentlyPlayingAlbum?.images?.[1]?.url,
+  ]);
 
   const handleAuthSuccess = () => {
     const storedAccessToken = localStorage.getItem("spotifyAccessToken");
@@ -547,14 +576,14 @@ function App() {
     }
   };
 
-  const handleNavigateToArtistFromNowPlaying = (artistId, contentType) => {
-    setContentSourceSection("nowPlaying");
+  const handleNavigateToArtistFromMedia = (artistId, contentType) => {
+    setContentSourceSection("media");
     setViewingContent({ id: artistId, type: contentType });
     setActiveSection("artists");
   };
 
-  const handleNavigateToAlbumFromNowPlaying = (albumId, contentType) => {
-    setContentSourceSection("nowPlaying");
+  const handleNavigateToAlbumFromMedia = (albumId, contentType) => {
+    setContentSourceSection("media");
     setViewingContent({ id: albumId, type: contentType });
     setActiveSection("recents");
   };
@@ -569,9 +598,9 @@ function App() {
     }
   };
 
-  const handleNavigateToNowPlaying = () => {
+  const handleNavigateToMedia = () => {
     setViewingContent(null);
-    setActiveSection("nowPlaying");
+    setActiveSection("media");
   };
 
   const handleNavigateToArtist = (id, type) => {
@@ -603,19 +632,6 @@ function App() {
     content = <AuthContainer onAuthSuccess={handleAuthSuccess} />;
   } else if (showTutorial) {
     content = <Tutorial onComplete={handleTutorialComplete} />;
-  } else if (activeSection === "nowPlaying") {
-    content = (
-      <NowPlaying
-        accessToken={accessToken}
-        currentPlayback={currentPlayback}
-        playbackProgress={playbackProgress}
-        onClose={() => setActiveSection("recents")}
-        updateGradientColors={updateGradientColors}
-        onOpenDeviceSwitcher={handleOpenDeviceSwitcher}
-        onNavigateToArtist={handleNavigateToArtistFromNowPlaying}
-        onNavigateToAlbum={handleNavigateToAlbumFromNowPlaying}
-      />
-    );
   } else if (viewingContent) {
     content = (
       <ContentView
@@ -623,7 +639,7 @@ function App() {
         contentId={viewingContent.id}
         contentType={viewingContent.type}
         onClose={handleCloseContent}
-        onNavigateToNowPlaying={handleNavigateToNowPlaying}
+        onNavigateToNowPlaying={handleNavigateToMedia}
         currentlyPlayingTrackUri={currentPlayback?.item?.uri}
         currentPlayback={currentPlayback}
         radioMixes={radioMixes}

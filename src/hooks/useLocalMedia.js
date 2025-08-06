@@ -47,7 +47,8 @@ export const useLocalMedia = () => {
 
   // --- State for smooth, client-side UI updates ---
   const [clientPosition, setClientPosition] = useState(0);
-  const [clientVolume, setClientVolume] = useState(null); // Use null to indicate no override
+  const [clientVolume, setClientVolume] = useState(null); // Optimistic volume updates
+  const clientVolumeTimerRef = useRef(null);
 
   const animationFrameRef = useRef(null);
   const lastServerStateRef = useRef(null);
@@ -92,7 +93,20 @@ export const useLocalMedia = () => {
   }, [sendCommand]);
 
   const setVolume = useCallback((newVolume) => {
+    // Optimistic update for instant UI feedback
     setClientVolume(newVolume);
+    
+    // Clear any existing timer
+    if (clientVolumeTimerRef.current) {
+      clearTimeout(clientVolumeTimerRef.current);
+    }
+    
+    // Reset client volume after 2 seconds (allows for network delays)
+    clientVolumeTimerRef.current = setTimeout(() => {
+      setClientVolume(null);
+    }, 2000);
+    
+    // Send to server (debounced)
     debouncedVolumeCommand(newVolume);
     // Don't update lastClientUpdateRef when changing volume to avoid position jumps
   }, [debouncedVolumeCommand]);
@@ -108,6 +122,12 @@ export const useLocalMedia = () => {
     } else if (data.type === 'media/state_update') {
       const serverState = data.payload;
       const isTrackChange = lastServerStateRef.current?.track !== serverState.track;
+      
+      // Clear client volume override when server confirms
+      setClientVolume(null);
+      if (clientVolumeTimerRef.current) {
+        clearTimeout(clientVolumeTimerRef.current);
+      }
       const isVolumeOnlyUpdate = lastServerStateRef.current && 
         lastServerStateRef.current.position_ms === serverState.position_ms &&
         lastServerStateRef.current.is_playing === serverState.is_playing &&
@@ -199,13 +219,14 @@ export const useLocalMedia = () => {
     return () => cancelAnimationFrame(animationFrameRef.current);
   }, [isPlaying, duration]);
 
-  // Reset local volume override after a period of inactivity
+  // Cleanup timer on unmount
   useEffect(() => {
-    if (clientVolume !== null) {
-      const timer = setTimeout(() => setClientVolume(null), 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [clientVolume]);
+    return () => {
+      if (clientVolumeTimerRef.current) {
+        clearTimeout(clientVolumeTimerRef.current);
+      }
+    };
+  }, []);
 
   const formatTime = useCallback((ms) => {
     if (!ms || ms < 0) return '0:00';

@@ -15,6 +15,7 @@ export function useGradientTransition(activeSection) {
   const [gradientTransitionDurationMs] = useState(3000);
 
   const lastProcessedUrlRef = useRef(null);
+  const lastProcessedTrackNameRef = useRef(null);
   const lastProcessedSectionRef = useRef(null);
 
   const MAX_BRIGHTNESS_THRESHOLD = 200;
@@ -292,7 +293,14 @@ export function useGradientTransition(activeSection) {
   );
 
   const updateGradientColors = useCallback(
-    async (imageUrl, imageSection = null) => {
+    async (imageUrl, imageSection = null, trackName = null) => {
+      console.log("🎨 updateGradientColors called:", {
+        imageUrl,
+        imageSection,
+        trackName,
+        timestamp: new Date().toISOString()
+      });
+      
       const skipCacheCheck =
         imageSection === "nowPlaying" || imageSection === "recents" || imageSection === "media";
       const urlSectionKey = `${imageUrl || "none"}-${imageSection || "none"}`;
@@ -302,13 +310,16 @@ export function useGradientTransition(activeSection) {
         urlSectionKey ===
           `${lastProcessedUrlRef.current || "none"}-${
             lastProcessedSectionRef.current || "none"
-          }`
+          }` &&
+        trackName === lastProcessedTrackNameRef.current
       ) {
+        console.log("🎨 Skipping gradient update - same URL/section/track");
         return;
       }
 
       lastProcessedUrlRef.current = imageUrl || "none";
       lastProcessedSectionRef.current = imageSection || "none";
+      lastProcessedTrackNameRef.current = trackName;
 
       let newColorsForImageSection;
       let isError = false;
@@ -340,8 +351,11 @@ export function useGradientTransition(activeSection) {
         else newColorsForImageSection = ["#191414", "#191414", "#191414", "#191414"];
       } else {
         try {
+          await new Promise(resolve => setTimeout(resolve, 3500));
+          
           let extracted = await extractColorsFromImage(imageUrl);
           newColorsForImageSection = filterColors(extracted);
+          console.log("🎨 Extracted and filtered colors:", newColorsForImageSection);
         } catch (error) {
           console.error("Error updating gradient colors:", error);
           newColorsForImageSection = ["#191414", "#191414", "#191414", "#191414"];
@@ -382,12 +396,15 @@ export function useGradientTransition(activeSection) {
       }
 
       if (shouldUpdateGlobalGradient) {
+        console.log("🎨 Updating global gradient for section:", imageSection);
         setCurrentGradientHexColors(newColorsForImageSection);
       } else if (activeSection && sectionGradients[activeSection]) {
         if (JSON.stringify(currentGradientHexColors) !== JSON.stringify(sectionGradients[activeSection])) {
+          console.log("🎨 Using cached gradient for active section:", activeSection);
           setCurrentGradientHexColors(sectionGradients[activeSection]);
         }
       } else if (JSON.stringify(currentGradientHexColors) !== JSON.stringify(["#191414", "#191414", "#191414", "#191414"])) {
+        console.log("🎨 No gradient update needed");
       }
     },
     [activeSection, filterColors, hexToRgb, rgbToHex]

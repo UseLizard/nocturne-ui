@@ -1,23 +1,27 @@
-import { useMemo } from 'react';
-import { useCallback } from 'react';
-import { useState } from 'react';
+import { useMemo, useCallback, useState } from 'react';
 
 export function useGradientState(activeSection = null) {
   const [imageURL, setImageURL] = useState(null);
+  const [imageSize, setImageSize] = useState(0);
   const [section, setSection] = useState(activeSection);
+  const [trackName, setTrackName] = useState(null);
 
   const gradientState = useMemo(
     () => ({
       imageURL,
+      imageSize,
       section,
+      trackName,
     }),
-    [imageURL, section],
+    [imageURL, imageSize, section, trackName],
   );
 
   const setGradientState = useCallback(
-    (newImageURL = null, newSection = null) => {
+    (newImageURL = null, newSection = null, newImageSize = 0, newTrackName = null) => {
       setImageURL(newImageURL);
       setSection(newSection);
+      setImageSize(newImageSize);
+      setTrackName(newTrackName);
     },
     [],
   );

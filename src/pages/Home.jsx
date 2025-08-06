@@ -70,7 +70,8 @@ export default function Home({
     } else if (activeSection === "settings") {
       updateGradientColors(null, "settings");
     } else if (activeSection === "media") {
-      updateGradientColors(null, "media");
+      // Don't set a null gradient for media - let LocalMediaPlayer handle it
+      // updateGradientColors(null, "media");
     } else if (activeSection === "bluetooth") {
       updateGradientColors(null, "bluetooth");
     } else if (activeSection === "albumart") {
