@@ -22,10 +22,13 @@ const DoubleBufferedImage = ({
   const [buffer1Loaded, setBuffer1Loaded] = useState(false);
   // Track if we should show fallback
   const [showFallback, setShowFallback] = useState(!src);
+  // Track if we're transitioning
+  const [isTransitioning, setIsTransitioning] = useState(false);
   
   const buffer0Ref = useRef(null);
   const buffer1Ref = useRef(null);
   const pendingSrcRef = useRef(null);
+  const transitionTimeoutRef = useRef(null);
 
   useEffect(() => {
     if (!src) {
@@ -53,6 +56,15 @@ const DoubleBufferedImage = ({
     }
   }, [src, activeBuffer, buffer0Src, buffer1Src]);
 
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const handleImageLoad = (bufferIndex, event) => {
     // Mark buffer as loaded
     if (bufferIndex === 0) {
@@ -64,9 +76,22 @@ const DoubleBufferedImage = ({
     // If this is the buffer we're waiting for, switch to it
     const loadedSrc = event.target.src;
     if (loadedSrc === pendingSrcRef.current || loadedSrc.includes(pendingSrcRef.current)) {
+      // Clear any existing transition timeout
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+      }
+      
+      // Start the transition
+      setIsTransitioning(true);
       setActiveBuffer(bufferIndex);
       setShowFallback(false);
       pendingSrcRef.current = null;
+      
+      // End the transition after the duration
+      transitionTimeoutRef.current = setTimeout(() => {
+        setIsTransitioning(false);
+        transitionTimeoutRef.current = null;
+      }, transitionDuration);
       
       // Call the onLoad callback after the transition completes
       if (onLoad) {
@@ -96,11 +121,13 @@ const DoubleBufferedImage = ({
         ref={buffer0Ref}
         src={buffer0Src}
         alt={alt}
-        className={`absolute inset-0 ${className} transition-opacity`}
+        className={`absolute inset-0 ${className}`}
         style={{
           opacity: activeBuffer === 0 && !showFallback ? 1 : 0,
-          transitionDuration: `${transitionDuration}ms`,
-          pointerEvents: activeBuffer === 0 ? 'auto' : 'none'
+          transition: isTransitioning ? `opacity ${transitionDuration}ms ease-in-out` : 'none',
+          pointerEvents: activeBuffer === 0 ? 'auto' : 'none',
+          // Keep image visible behind during transition for smoother effect
+          zIndex: activeBuffer === 0 ? 2 : 1
         }}
         onLoad={(e) => handleImageLoad(0, e)}
         onError={() => handleImageError(0)}
@@ -112,11 +139,13 @@ const DoubleBufferedImage = ({
           ref={buffer1Ref}
           src={buffer1Src}
           alt={alt}
-          className={`absolute inset-0 ${className} transition-opacity`}
+          className={`absolute inset-0 ${className}`}
           style={{
             opacity: activeBuffer === 1 && !showFallback ? 1 : 0,
-            transitionDuration: `${transitionDuration}ms`,
-            pointerEvents: activeBuffer === 1 ? 'auto' : 'none'
+            transition: isTransitioning ? `opacity ${transitionDuration}ms ease-in-out` : 'none',
+            pointerEvents: activeBuffer === 1 ? 'auto' : 'none',
+            // Keep image visible behind during transition for smoother effect
+            zIndex: activeBuffer === 1 ? 2 : 1
           }}
           onLoad={(e) => handleImageLoad(1, e)}
           onError={() => handleImageError(1)}
@@ -125,10 +154,11 @@ const DoubleBufferedImage = ({
       
       {/* Fallback content */}
       {showFallback && fallback && (
-        <div className={`absolute inset-0 flex items-center justify-center transition-opacity`}
+        <div className={`absolute inset-0 flex items-center justify-center`}
           style={{
             opacity: showFallback ? 1 : 0,
-            transitionDuration: `${transitionDuration}ms`
+            transition: `opacity ${transitionDuration}ms ease-in-out`,
+            zIndex: 3
           }}
         >
           {fallback}
