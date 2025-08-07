@@ -33,7 +33,7 @@ export function useGestureControls({
 
       if (
         Math.abs(deltaY) > Math.abs(deltaX) &&
-        Math.abs(deltaY) > 20 &&
+        Math.abs(deltaY) > 10 &&
         settings.showLyricsGestureEnabled
       ) {
         e.preventDefault();
@@ -41,7 +41,7 @@ export function useGestureControls({
 
       if (
         Math.abs(deltaX) > Math.abs(deltaY) &&
-        Math.abs(deltaX) > 20 &&
+        Math.abs(deltaX) > 10 &&
         settings.songChangeGestureEnabled
       ) {
         e.preventDefault();
@@ -61,15 +61,15 @@ export function useGestureControls({
       const isHorizontalSwipe = Math.abs(deltaX) > Math.abs(deltaY);
 
       if (isHorizontalSwipe && settings.songChangeGestureEnabled) {
-        if (deltaX > 50 && onSwipeLeft) {
+        if (deltaX > 30 && onSwipeLeft) {
           onSwipeLeft();
-        } else if (deltaX < -50 && onSwipeRight) {
+        } else if (deltaX < -30 && onSwipeRight) {
           onSwipeRight();
         }
       } else if (!isHorizontalSwipe && settings.showLyricsGestureEnabled) {
-        if (deltaY > 50 && onSwipeUp) {
+        if (deltaY > 35 && onSwipeUp) {
           onSwipeUp();
-        } else if (deltaY < -50 && onSwipeDown) {
+        } else if (deltaY < -35 && onSwipeDown) {
           onSwipeDown();
         }
       }

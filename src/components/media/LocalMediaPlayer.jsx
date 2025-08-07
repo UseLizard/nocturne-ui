@@ -378,11 +378,12 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
       {/* Global Gradient Background */}
       <GradientBackground gradientState={gradientState} className="absolute inset-0 -z-10 bg-black" />
       
-      {/* Main Content Area */}
-      <div 
-        className="md:w-1/3 flex flex-row items-center px-12 pt-10 flex-1"
-        ref={contentContainerRef}
-      >
+      {/* Content wrapper for gesture controls */}
+      <div ref={contentContainerRef} className="flex flex-col justify-between h-full w-full">
+        {/* Main Content Area */}
+        <div 
+          className="md:w-1/3 flex flex-row items-center px-12 pt-10 flex-1"
+        >
         {/* Album Art - Blank Square */}
         <div className="min-w-[280px] mr-8">
           <div
@@ -635,6 +636,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
           </div>
         </div>
         </div>
+      </div>
       </div>
 
       {/* Loading Indicator */}

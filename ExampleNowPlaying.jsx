@@ -1,14 +1,20 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  useMemo,
+} from "react";
 import { Menu, MenuButton, MenuItem, MenuItems } from "@headlessui/react";
 import { useSpotifyPlayerControls } from "../../hooks/useSpotifyPlayerControls";
 import { useNavigation } from "../../hooks/useNavigation";
 import { useLyrics } from "../../hooks/useLyrics";
 import { useGestureControls } from "../../hooks/useGestureControls";
 import { useElapsedTime } from "../../hooks/useElapsedTime";
-import { useMediaScrollWheel } from "../../hooks/useScrollWheel";
+import { useButtonMapping } from "../../hooks/useButtonMapping";
+import ButtonMappingOverlay from "../common/overlays/ButtonMappingOverlay";
 import ProgressBar from "./ProgressBar";
 import ScrollingText from "../common/ScrollingText";
-import DoubleBufferedImage from "../common/DoubleBufferedImage";
 import {
   HeartIcon,
   HeartIconFilled,
@@ -26,11 +32,9 @@ import {
   ShuffleIcon,
   RepeatIcon,
   RepeatOneIcon,
-  SkipForwardIcon,
-  SkipBackwardIcon,
   SpeedIcon,
 } from "../common/icons";
-
+import { generateRandomString } from "../../utils/helpers";
 
 export default function NowPlaying({
   accessToken,
@@ -41,27 +45,31 @@ export default function NowPlaying({
   onOpenDeviceSwitcher,
   onNavigateToArtist,
   onNavigateToAlbum,
+  setIgnoreNextRelease,
 }) {
   const [isLiked, setIsLiked] = useState(false);
   const [isCheckingLike, setIsCheckingLike] = useState(false);
   const [isProgressScrubbing, setIsProgressScrubbing] = useState(false);
   const [volumeOverlayState, setVolumeOverlayState] = useState({
     visible: false,
-    animation: "hidden"
+    animation: "hidden",
   });
   const [shuffleEnabled, setShuffleEnabled] = useState(false);
   const [repeatMode, setRepeatMode] = useState("off");
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
-  const [localVolume, setLocalVolume] = useState(null);
-  
+
   const volumeTimerRef = useRef(null);
   const volumeLastAdjustedRef = useRef(0);
+  const lastWheelEventRef = useRef(0);
+  const wheelDeltaAccumulatorRef = useRef(0);
   const containerRef = useRef(null);
   const currentTrackIdRef = useRef(null);
-  const isSeekingRef = useRef(false);
-  
+  const prevVolumeRef = useRef(null);
+  const manualVolumeChangeRef = useRef(false);
+
   const isDJPlaylist =
     currentPlayback?.context?.uri === "spotify:playlist:37i9dQZF1EYkqdzj48dyYq";
+  const isPodcast = currentPlayback?.item?.type === "episode";
   const contentContainerRef = useRef(null);
 
   const { elapsedTimeEnabled } = useElapsedTime();
@@ -77,7 +85,7 @@ export default function NowPlaying({
     unlikeTrack,
     sendDJSignal,
     setVolume,
-    volume: spotifyVolume,
+    volume,
     updateVolumeFromDevice,
     toggleShuffle,
     setRepeatMode: setRepeatModeApi,
@@ -91,32 +99,8 @@ export default function NowPlaying({
     duration,
     progressPercentage,
     updateProgress,
-    triggerRefresh
+    triggerRefresh,
   } = playbackProgress;
-
-  const volume = localVolume ?? spotifyVolume;
-
-  const debouncedSetVolume = useCallback(
-    debounce((newVolume) => {
-      setVolume(newVolume);
-    }, 250),
-    [setVolume]
-  );
-
-  const handleVolumeChange = useCallback((newVolume) => {
-    setLocalVolume(newVolume);
-    showVolumeOverlay();
-    debouncedSetVolume(newVolume);
-  }, [showVolumeOverlay, debouncedSetVolume]);
-
-  useEffect(() => {
-    if (localVolume !== null) {
-      const timer = setTimeout(() => {
-        setLocalVolume(null);
-      }, 1000); // Reset local volume after 1s of inactivity
-      return () => clearTimeout(timer);
-    }
-  }, [localVolume]);
 
   const convertTimeToLength = (ms, elapsed) => {
     let totalSeconds = Math.floor(ms / 1000);
@@ -136,40 +120,47 @@ export default function NowPlaying({
 
     return `${!elapsed ? "-" : ""}${formattedMinutes}:${formattedSeconds}`;
   };
-  
+
   useEffect(() => {
     if (currentPlayback?.device?.volume_percent !== undefined) {
+      if (prevVolumeRef.current === null) {
+        prevVolumeRef.current = currentPlayback.device.volume_percent;
+      }
       updateVolumeFromDevice(currentPlayback.device.volume_percent);
     }
   }, [currentPlayback?.device?.volume_percent, updateVolumeFromDevice]);
-  
+
   const showVolumeOverlay = useCallback(() => {
+    if (!manualVolumeChangeRef.current) return;
+
     volumeLastAdjustedRef.current = Date.now();
-    
+
     if (volumeTimerRef.current) {
       clearTimeout(volumeTimerRef.current);
     }
-    
+
     setVolumeOverlayState({
       visible: true,
-      animation: "showing"
+      animation: "showing",
     });
-    
+
     volumeTimerRef.current = setTimeout(() => {
-      setVolumeOverlayState(prev => ({
+      setVolumeOverlayState((prev) => ({
         ...prev,
-        animation: "hiding"
+        animation: "hiding",
       }));
-      
+
       setTimeout(() => {
         setVolumeOverlayState({
           visible: false,
-          animation: "hidden"
+          animation: "hidden",
         });
+
+        manualVolumeChangeRef.current = false;
       }, 300);
     }, 1500);
   }, []);
-  
+
   useEffect(() => {
     return () => {
       if (volumeTimerRef.current) {
@@ -177,14 +168,19 @@ export default function NowPlaying({
       }
     };
   }, []);
-  
-  // Unified scroll wheel for volume control (Spotify mode)
-  useMediaScrollWheel({
-    containerRef,
-    onVolumeChange: handleVolumeChange,
-    currentVolume: volume,
-    enabled: !isProgressScrubbing,
-  });
+
+  useEffect(() => {
+    if (prevVolumeRef.current === null) {
+      prevVolumeRef.current = volume;
+      return;
+    }
+
+    if (prevVolumeRef.current !== volume && manualVolumeChangeRef.current) {
+      showVolumeOverlay();
+    }
+
+    prevVolumeRef.current = volume;
+  }, [volume, showVolumeOverlay]);
 
   useEffect(() => {
     if (currentPlayback?.shuffle_state !== undefined) {
@@ -198,8 +194,88 @@ export default function NowPlaying({
   const handlePlayPause = async () => {
     if (currentPlayback?.is_playing) {
       await pausePlayback();
-    } else if (currentPlayback?.item) {
+      return;
+    }
+
+    if (currentPlayback?.item) {
       await playTrack();
+      return;
+    }
+
+    try {
+      if (!accessToken) return;
+
+      const connectEndpoint = `https://gue1-spclient.spotify.com/connect-state/v1/devices/hobs_${generateRandomString(40)}`;
+
+      const devicesRes = await fetch(connectEndpoint, {
+        method: "PUT",
+        headers: {
+          accept: "application/json",
+          "accept-language": "en-US,en;q=0.9",
+          authorization: `Bearer ${accessToken}`,
+          "content-type": "application/json",
+          "x-spotify-connection-id": generateRandomString(148),
+        },
+        body: JSON.stringify({
+          member_type: "CONNECT_STATE",
+          device: {
+            device_info: {
+              capabilities: {
+                can_be_player: false,
+                hidden: true,
+                needs_full_player_state: true,
+              },
+            },
+          },
+        }),
+      });
+
+      if (!devicesRes.ok) {
+        console.error("Failed to retrieve devices", devicesRes.status);
+        return;
+      }
+
+      const data = await devicesRes.json();
+      const devicesArray = Object.values(data.devices || {});
+
+      if (devicesArray.length === 0) return;
+
+      const activeDevice = devicesArray.find((d) => d.is_active);
+
+      if (!activeDevice && devicesArray.length > 1) {
+        if (typeof onOpenDeviceSwitcher === "function") {
+          onOpenDeviceSwitcher(devicesArray);
+        }
+        return;
+      }
+
+      const target = activeDevice || devicesArray[0];
+      const targetDeviceId = target.device_id || target.id;
+
+      const transferRes = await fetch("https://api.spotify.com/v1/me/player", {
+        method: "PUT",
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          device_ids: [targetDeviceId],
+          play: true,
+        }),
+      });
+
+      if (!transferRes.ok && transferRes.status !== 204) {
+        console.error("Failed to transfer playback", await transferRes.text());
+        return;
+      }
+
+      setTimeout(() => {
+        if (typeof triggerRefresh === "function") {
+          triggerRefresh();
+        }
+      }, 1000);
+    } catch (err) {
+      console.error("Error attempting to resume playback:", err);
     }
   };
 
@@ -213,9 +289,7 @@ export default function NowPlaying({
     const artistName = currentPlayback?.item
       ? currentPlayback.item.type === "episode"
         ? currentPlayback.item.show.name
-        : currentPlayback.item.artists
-        ? currentPlayback.item.artists.map((artist) => artist.name).join(", ")
-        : currentPlayback.item.artist || ""
+        : currentPlayback.item.artists.map((artist) => artist.name).join(", ")
       : "";
 
     const firstArtistId =
@@ -228,20 +302,122 @@ export default function NowPlaying({
       ? currentPlayback.item.type === "episode"
         ? currentPlayback.item.show.images[1]?.url || "/images/not-playing.webp"
         : currentPlayback.item.type === "local" ||
-          !currentPlayback.item?.album?.images?.[1]?.url ||
-          !currentPlayback.item?.album?.images?.[1]
-        ? "/images/not-playing.webp"
-        : currentPlayback.item.album.images[1].url
+            !currentPlayback.item?.album?.images?.[1]?.url ||
+            !currentPlayback.item?.album?.images?.[1]
+          ? "/images/not-playing.webp"
+          : currentPlayback.item.album.images[1].url
       : "/images/not-playing.webp";
 
     const trackId = currentPlayback?.item?.id;
-    
+
     return { trackName, artistName, albumArt, trackId, firstArtistId, albumId };
   }, [currentPlayback]);
 
-  const { trackName, artistName, albumArt, trackId, firstArtistId, albumId } = trackInfo;
+  const { trackName, artistName, albumArt, trackId, firstArtistId, albumId } =
+    trackInfo;
 
-  // Removed old handleWheel implementation - now using unified useMediaScrollWheel
+  const contextUri = currentPlayback?.context?.uri;
+  const playlistId = useMemo(() => {
+    if (contextUri && contextUri.startsWith("spotify:playlist:")) {
+      const parts = contextUri.split(":");
+      return parts[2] || null;
+    }
+    return null;
+  }, [contextUri]);
+
+  const [playlistDetails, setPlaylistDetails] = useState({
+    name: "",
+    image: "",
+  });
+
+  useEffect(() => {
+    const fetchPlaylistDetails = async () => {
+      if (!playlistId || !accessToken) return;
+      try {
+        const res = await fetch(
+          `https://api.spotify.com/v1/playlists/${playlistId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${accessToken}`,
+            },
+          },
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        setPlaylistDetails({
+          name: data.name || "",
+          image: data.images?.[1]?.url || data.images?.[0]?.url || "",
+        });
+      } catch (err) {
+        console.error("Failed to fetch playlist details", err);
+      }
+    };
+
+    fetchPlaylistDetails();
+  }, [playlistId, accessToken]);
+
+  const { showMappingOverlay, activeButton } = useButtonMapping({
+    accessToken,
+    contentId: playlistId,
+    contentType: playlistId ? "playlist" : null,
+    contentImage: playlistDetails.image || albumArt,
+    contentName: playlistDetails.name || trackName,
+    playTrack,
+    isActive: !!playlistId,
+    setIgnoreNextRelease,
+  });
+
+  const handleWheel = useCallback(
+    (e) => {
+      if (isProgressScrubbing) return;
+
+      const now = Date.now();
+      if (now - lastWheelEventRef.current < 50) {
+        e.preventDefault();
+        return;
+      }
+      lastWheelEventRef.current = now;
+
+      e.preventDefault();
+      e.stopPropagation();
+
+      const delta =
+        Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      wheelDeltaAccumulatorRef.current += delta;
+
+      if (Math.abs(wheelDeltaAccumulatorRef.current) >= 2) {
+        const direction = wheelDeltaAccumulatorRef.current > 0 ? 1 : -1;
+        const newVolume = Math.max(0, Math.min(100, volume + direction * 5));
+
+        wheelDeltaAccumulatorRef.current = 0;
+
+        if (newVolume !== volume) {
+          manualVolumeChangeRef.current = true;
+          setVolume(newVolume);
+        }
+      }
+    },
+    [isProgressScrubbing, volume, setVolume],
+  );
+
+  useEffect(() => {
+    const container = containerRef.current;
+    let options = { passive: false, capture: true };
+
+    const handleWheelWithOptions = (e) => {
+      handleWheel(e);
+    };
+
+    if (container) {
+      container.addEventListener("wheel", handleWheelWithOptions, options);
+    }
+
+    return () => {
+      if (container) {
+        container.removeEventListener("wheel", handleWheelWithOptions, options);
+      }
+    };
+  }, [handleWheel]);
 
   useNavigation({
     containerRef,
@@ -262,12 +438,12 @@ export default function NowPlaying({
       handleSkipPrevious();
     },
     onSwipeUp: () => {
-      if (!showLyrics) {
+      if (!isPodcast && !showLyrics) {
         toggleLyrics();
       }
     },
     onSwipeDown: () => {
-      if (showLyrics) {
+      if (!isPodcast && showLyrics) {
         toggleLyrics();
       }
     },
@@ -277,6 +453,7 @@ export default function NowPlaying({
   const {
     showLyrics,
     lyrics,
+    hasLyrics,
     currentLyricIndex,
     isLoading: lyricsLoading,
     error: lyricsError,
@@ -319,30 +496,31 @@ export default function NowPlaying({
   }, [trackId, currentPlayback?.item?.type, isCheckingLike, checkIsTrackLiked]);
 
   const handleSkipNext = useCallback(async () => {
-    if (currentPlayback?.item?.type === "episode") {
-      const newPosition = Math.min(progressMs + 15000, duration);
-      await seekToPosition(newPosition);
-      updateProgress(newPosition);
-    } else {
-      await skipToNext();
-    }
-  }, [currentPlayback?.item?.type, progressMs, duration, seekToPosition, updateProgress, skipToNext]);
+    await skipToNext();
+  }, [
+    currentPlayback?.item?.type,
+    progressMs,
+    duration,
+    seekToPosition,
+    updateProgress,
+    skipToNext,
+  ]);
 
   const handleSkipPrevious = useCallback(async () => {
-    if (currentPlayback?.item?.type === "episode") {
-      const newPosition = Math.max(progressMs - 15000, 0);
-      await seekToPosition(newPosition);
-      updateProgress(newPosition);
+    const RESTART_THRESHOLD_MS = 3000;
+    if (progressMs > RESTART_THRESHOLD_MS) {
+      await seekToPosition(0);
+      updateProgress(0);
     } else {
-      const RESTART_THRESHOLD_MS = 3000;
-      if (progressMs > RESTART_THRESHOLD_MS) {
-        await seekToPosition(0);
-        updateProgress(0);
-      } else {
-        await skipToPrevious();
-      }
+      await skipToPrevious();
     }
-  }, [currentPlayback?.item?.type, progressMs, seekToPosition, updateProgress, skipToPrevious]);
+  }, [
+    currentPlayback?.item?.type,
+    progressMs,
+    seekToPosition,
+    updateProgress,
+    skipToPrevious,
+  ]);
 
   const handleToggleLike = useCallback(async () => {
     if (!trackId || currentPlayback?.item?.type !== "track" || isCheckingLike)
@@ -360,22 +538,32 @@ export default function NowPlaying({
       setIsLiked(!isLiked);
       console.error("Error toggling track like:", error);
     }
-  }, [trackId, currentPlayback?.item?.type, isCheckingLike, isLiked, unlikeTrack, likeTrack]);
+  }, [
+    trackId,
+    currentPlayback?.item?.type,
+    isCheckingLike,
+    isLiked,
+    unlikeTrack,
+    likeTrack,
+  ]);
 
   const handleScrubbingChange = (scrubbing) => {
     setIsProgressScrubbing(scrubbing);
   };
 
-  const handleSeek = useCallback(async (position) => {
-    try {
-      if (currentPlayback?.item) {
-        await seekToPosition(position);
-        updateProgress(position);
+  const handleSeek = useCallback(
+    async (position) => {
+      try {
+        if (currentPlayback?.item) {
+          await seekToPosition(position);
+          updateProgress(position);
+        }
+      } catch (error) {
+        console.error("Error seeking:", error);
       }
-    } catch (error) {
-      console.error("Error seeking:", error);
-    }
-  }, [currentPlayback?.item, seekToPosition, updateProgress]);
+    },
+    [currentPlayback?.item, seekToPosition, updateProgress],
+  );
 
   const handleToggleShuffle = useCallback(async () => {
     try {
@@ -448,7 +636,10 @@ export default function NowPlaying({
       document.addEventListener("visibilitychange", handleVisibilityChange);
 
       return () => {
-        document.removeEventListener("visibilitychange", handleVisibilityChange);
+        document.removeEventListener(
+          "visibilitychange",
+          handleVisibilityChange,
+        );
       };
     }
   }, [currentPlayback?.is_playing]);
@@ -464,30 +655,32 @@ export default function NowPlaying({
       className="flex flex-col gap-1 h-screen w-full z-10 fadeIn-animation"
       ref={containerRef}
     >
-      <div ref={contentContainerRef} className="flex flex-col h-full w-full">
+      <div ref={contentContainerRef}>
         <div className="md:w-1/3 flex flex-row items-center px-12 pt-10">
-          <div className={`min-w-[280px] mr-8 ${albumId ? 'cursor-pointer' : ''}`} onClick={() => albumId && onNavigateToAlbum && onNavigateToAlbum(albumId, "album")}>
-            <div className="w-[280px] h-[280px] aspect-square rounded-[12px] drop-shadow-[0_8px_5px_rgba(0,0,0,0.25)] overflow-hidden">
-              <DoubleBufferedImage
-                src={albumArt}
-                alt={
-                  currentPlayback?.item?.type === "episode"
-                    ? "Podcast Cover"
-                    : "Album Art"
-                }
-                className="w-full h-full object-cover"
-                onLoad={() => {
-                  // Update gradient colors when image loads
-                  if (updateGradientColors && albumArt) {
-                    updateGradientColors(albumArt, "nowPlaying");
-                  }
-                }}
-                fallback={
-                  <div className="w-full h-full bg-white/10 animate-pulse" />
-                }
-                transitionDuration={500}
-              />
-            </div>
+          <div
+            className={`min-w-[280px] h-[280px] mr-8 ${albumId ? "cursor-pointer" : ""}`}
+            onClick={() =>
+              albumId &&
+              onNavigateToAlbum &&
+              onNavigateToAlbum(albumId, "album")
+            }
+          >
+            <img
+              src={albumArt}
+              alt={
+                currentPlayback?.item?.type === "episode"
+                  ? "Podcast Cover"
+                  : "Album Art"
+              }
+              width={280}
+              height={280}
+              loading="lazy"
+              onError={(e) => {
+                e.currentTarget.onerror = null;
+                e.currentTarget.src = "/images/not-playing.webp";
+              }}
+              className="aspect-square rounded-[12px] drop-shadow-[0_8px_5px_rgba(0,0,0,0.25)] max-w-[280px] max-h-[280px]"
+            />
           </div>
 
           {!showLyrics ? (
@@ -502,8 +695,12 @@ export default function NowPlaying({
                 />
               </div>
               <h4
-                className={`text-[36px] font-[560] text-white/60 truncate tracking-tight max-w-[380px] ${firstArtistId ? 'cursor-pointer' : ''}`}
-                onClick={() => firstArtistId && onNavigateToArtist && onNavigateToArtist(firstArtistId, "artist")}
+                className={`text-[36px] font-[560] text-white/60 truncate tracking-tight max-w-[380px] ${firstArtistId ? "cursor-pointer" : ""}`}
+                onClick={() =>
+                  firstArtistId &&
+                  onNavigateToArtist &&
+                  onNavigateToArtist(firstArtistId, "artist")
+                }
               >
                 {artistName}
               </h4>
@@ -513,12 +710,12 @@ export default function NowPlaying({
               <div
                 className="flex-1 text-left overflow-y-auto h-[280px] w-[380px] transform-gpu will-change-scroll"
                 ref={lyricsContainerRef}
-                style={{ 
-                  scrollBehavior: 'smooth',
-                  transform: 'translateZ(0)',
-                  backfaceVisibility: 'hidden',
-                  WebkitBackfaceVisibility: 'hidden',
-                  perspective: '1000px'
+                style={{
+                  scrollBehavior: "smooth",
+                  transform: "translateZ(0)",
+                  backfaceVisibility: "hidden",
+                  WebkitBackfaceVisibility: "hidden",
+                  perspective: "1000px",
                 }}
               >
                 {lyricsLoading ? (
@@ -537,14 +734,14 @@ export default function NowPlaying({
                         index === currentLyricIndex
                           ? "text-white current-lyric-animation"
                           : index === currentLyricIndex - 1 ||
-                            index === currentLyricIndex + 1
-                          ? "text-white/40"
-                          : "text-white/20"
+                              index === currentLyricIndex + 1
+                            ? "text-white/40"
+                            : "text-white/20"
                       }`}
                       style={{
-                        transform: 'translateZ(0)',
-                        backfaceVisibility: 'hidden',
-                        WebkitBackfaceVisibility: 'hidden'
+                        transform: "translateZ(0)",
+                        backfaceVisibility: "hidden",
+                        WebkitBackfaceVisibility: "hidden",
                       }}
                     >
                       {lyric.text}
@@ -559,8 +756,11 @@ export default function NowPlaying({
             </div>
           )}
         </div>
+      </div>
 
-        <div className={`px-12 ${elapsedTimeEnabled ? "pt-1 pb-1" : "pt-4 pb-7"}`}>
+      <div
+        className={`px-12 ${elapsedTimeEnabled ? "pt-1 pb-1" : "pt-4 pb-7"}`}
+      >
         <ProgressBar
           progress={progressPercentage}
           isPlaying={isPlaying}
@@ -573,11 +773,13 @@ export default function NowPlaying({
       </div>
 
       {elapsedTimeEnabled && (
-        <div className={`w-full px-12 pb-1.5 pt-1.5 -mb-1.5 overflow-hidden transition-all duration-200 ease-in-out ${
-          isProgressScrubbing
-            ? "translate-y-24 opacity-0"
-            : "translate-y-0 opacity-100"
-        }`}>
+        <div
+          className={`w-full px-12 pb-1.5 pt-1.5 -mb-1.5 overflow-hidden transition-all duration-200 ease-in-out ${
+            isProgressScrubbing
+              ? "translate-y-24 opacity-0"
+              : "translate-y-0 opacity-100"
+          }`}
+        >
           <div className="flex justify-between">
             {currentPlayback && currentPlayback.item ? (
               <>
@@ -585,10 +787,7 @@ export default function NowPlaying({
                   {convertTimeToLength(progressMs, true)}
                 </span>
                 <span className="text-white/60 text-[20px]">
-                  {convertTimeToLength(
-                    currentPlayback.item.duration_ms,
-                    true
-                  )}
+                  {convertTimeToLength(currentPlayback.item.duration_ms, true)}
                 </span>
               </>
             ) : (
@@ -612,7 +811,7 @@ export default function NowPlaying({
           <Menu as="div" className="relative inline-block text-left">
             {({ open }) => (
               <>
-                <MenuButton 
+                <MenuButton
                   className="focus:outline-none outline-none border-none bg-transparent appearance-none"
                   onClick={() => {
                     if (!open) {
@@ -620,40 +819,48 @@ export default function NowPlaying({
                     }
                   }}
                   style={{
-                    WebkitAppearance: 'none',
-                    MozAppearance: 'none',
-                    boxShadow: 'none',
-                    WebkitTapHighlightColor: 'transparent'
+                    WebkitAppearance: "none",
+                    MozAppearance: "none",
+                    boxShadow: "none",
+                    WebkitTapHighlightColor: "transparent",
                   }}
                 >
-                  <SpeedIcon className="w-14 h-14" />
+                  <SpeedIcon className="w-14 h-14 fill-white/60" />
                 </MenuButton>
 
                 <MenuItems
-              transition
-              className="absolute left-0 bottom-full z-10 mb-2 w-[16rem] origin-bottom-left divide-y divide-slate-100/25 bg-[#161616] rounded-[13px] shadow-xl transition focus:outline-none data-[closed]:scale-95 data-[closed]:transform data-[closed]:opacity-0 data-[enter]:duration-100 data-[leave]:duration-75 data-[enter]:ease-out data-[leave]:ease-in"
-            >
-              <div className="py-1">
-                <div className="px-4 py-[12px] text-sm text-white/60 font-[560] tracking-tight border-b border-slate-100/25">
-                  <span className="text-[24px]">Playback Speed</span>
-                </div>
-                {[0.5, 0.8, 1, 1.2, 1.5, 2].map((speed) => (
-                  <MenuItem key={speed} onClick={() => handleSpeedChange(speed)}>
-                    <div className="group flex items-center justify-between px-4 py-[16px] text-sm text-white font-[560] tracking-tight focus:outline-none outline-none">
-                      <span className="text-[28px]">{speed}x</span>
-                      {playbackSpeed === speed && (
-                        <div className="w-2 h-2 bg-white rounded-full"></div>
-                      )}
-                    </div>
-                  </MenuItem>
-                ))}
-              </div>
+                  transition
+                  className="absolute left-0 bottom-full z-10 mb-2 w-[16rem] origin-bottom-left divide-y divide-slate-100/25 bg-[#161616] rounded-[13px] shadow-xl transition focus:outline-none data-[closed]:scale-95 data-[closed]:transform data-[closed]:opacity-0 data-[enter]:duration-100 data-[leave]:duration-75 data-[enter]:ease-out data-[leave]:ease-in"
+                >
+                  <div className="py-1">
+                    {[0.5, 0.8, 1, 1.2, 1.5, 2].map((speed) => (
+                      <MenuItem
+                        key={speed}
+                        onClick={() => handleSpeedChange(speed)}
+                      >
+                        <div className="group flex items-center justify-between px-4 py-[16px] text-sm text-white font-[560] tracking-tight focus:outline-none outline-none">
+                          <span className="text-[24px]">{speed}x</span>
+                          {playbackSpeed === speed && (
+                            <div className="w-2 h-2 bg-white rounded-full"></div>
+                          )}
+                        </div>
+                      </MenuItem>
+                    ))}
+                  </div>
                 </MenuItems>
               </>
             )}
           </Menu>
         ) : (
-          <div className="flex-shrink-0 focus:outline-none outline-none border-none bg-transparent appearance-none" onClick={handleToggleLike} style={{ WebkitAppearance: 'none', MozAppearance: 'none', WebkitTapHighlightColor: 'transparent' }}>
+          <div
+            className="flex-shrink-0 focus:outline-none outline-none border-none bg-transparent appearance-none"
+            onClick={handleToggleLike}
+            style={{
+              WebkitAppearance: "none",
+              MozAppearance: "none",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
             {isLiked ? (
               <HeartIconFilled className="w-14 h-14" />
             ) : (
@@ -663,43 +870,63 @@ export default function NowPlaying({
         )}
 
         <div className="flex justify-center items-center flex-1">
-          <div onClick={handleSkipPrevious} className="mx-6 focus:outline-none outline-none border-none bg-transparent appearance-none" style={{ WebkitAppearance: 'none', MozAppearance: 'none', WebkitTapHighlightColor: 'transparent' }}>
-            {currentPlayback?.item?.type === "episode" ? (
-              <SkipBackwardIcon className="w-14 h-14" />
-            ) : (
-              <BackIcon className="w-14 h-14" />
-            )}
+          <div
+            onClick={handleSkipPrevious}
+            className="mx-6 focus:outline-none outline-none border-none bg-transparent appearance-none"
+            style={{
+              WebkitAppearance: "none",
+              MozAppearance: "none",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            <BackIcon className="w-14 h-14" />
           </div>
           <div
             onClick={handlePlayPause}
             className="transition-opacity duration-100 mx-6 focus:outline-none outline-none border-none bg-transparent appearance-none"
-            style={{ WebkitAppearance: 'none', MozAppearance: 'none', WebkitTapHighlightColor: 'transparent' }}
+            style={{
+              WebkitAppearance: "none",
+              MozAppearance: "none",
+              WebkitTapHighlightColor: "transparent",
+            }}
           >
             {PlayPauseIcon}
           </div>
-          <div onClick={handleSkipNext} className="mx-6 focus:outline-none outline-none border-none bg-transparent appearance-none" style={{ WebkitAppearance: 'none', MozAppearance: 'none', WebkitTapHighlightColor: 'transparent' }}>
-            {currentPlayback?.item?.type === "episode" ? (
-              <SkipForwardIcon className="w-14 h-14" />
-            ) : (
-              <ForwardIcon className="w-14 h-14" />
-            )}
+          <div
+            onClick={handleSkipNext}
+            className="mx-6 focus:outline-none outline-none border-none bg-transparent appearance-none"
+            style={{
+              WebkitAppearance: "none",
+              MozAppearance: "none",
+              WebkitTapHighlightColor: "transparent",
+            }}
+          >
+            <ForwardIcon className="w-14 h-14" />
           </div>
         </div>
 
         <div className="flex items-center">
           {isDJPlaylist && (
-            <div onClick={sendDJSignal} className="focus:outline-none outline-none border-none bg-transparent appearance-none" style={{ WebkitAppearance: 'none', MozAppearance: 'none', WebkitTapHighlightColor: 'transparent' }}>
+            <div
+              onClick={sendDJSignal}
+              className="focus:outline-none outline-none border-none bg-transparent appearance-none"
+              style={{
+                WebkitAppearance: "none",
+                MozAppearance: "none",
+                WebkitTapHighlightColor: "transparent",
+              }}
+            >
               <DJIcon className="w-14 h-14 fill-white/60 mr-4 mb-1" />
             </div>
           )}
           <Menu as="div" className="relative inline-block text-left">
-            <MenuButton 
+            <MenuButton
               className="focus:outline-none outline-none border-none bg-transparent appearance-none"
               style={{
-                WebkitAppearance: 'none',
-                MozAppearance: 'none',
-                boxShadow: 'none',
-                WebkitTapHighlightColor: 'transparent'
+                WebkitAppearance: "none",
+                MozAppearance: "none",
+                boxShadow: "none",
+                WebkitTapHighlightColor: "transparent",
               }}
             >
               <MenuIcon className="w-14 h-14 fill-white/60" />
@@ -710,19 +937,21 @@ export default function NowPlaying({
               className="absolute right-0 bottom-full z-10 mb-2 w-[22rem] origin-bottom-right divide-y divide-slate-100/25 bg-[#161616] rounded-[13px] shadow-xl transition focus:outline-none data-[closed]:scale-95 data-[closed]:transform data-[closed]:opacity-0 data-[enter]:duration-100 data-[leave]:duration-75 data-[enter]:ease-out data-[leave]:ease-in"
             >
               <div className="py-1">
-                <MenuItem onClick={toggleLyrics}>
-                  <div className="group flex items-center justify-between px-4 py-[16px] text-sm text-white font-[560] tracking-tight focus:outline-none outline-none">
-                    <span className="text-[28px]">
-                      {showLyrics ? "Hide Lyrics" : "Show Lyrics"}
-                    </span>
-                    <LyricsIcon
-                      aria-hidden="true"
-                      className={`h-8 w-8 ${
-                        showLyrics ? "text-white" : "text-white/60"
-                      }`}
-                    />
-                  </div>
-                </MenuItem>
+                {!isPodcast && (
+                  <MenuItem onClick={toggleLyrics}>
+                    <div className="group flex items-center justify-between px-4 py-[16px] text-sm text-white font-[560] tracking-tight focus:outline-none outline-none">
+                      <span className="text-[28px]">
+                        {showLyrics ? "Hide Lyrics" : "Show Lyrics"}
+                      </span>
+                      <LyricsIcon
+                        aria-hidden="true"
+                        className={`h-8 w-8 ${
+                          showLyrics ? "text-white" : "text-white/60"
+                        }`}
+                      />
+                    </div>
+                  </MenuItem>
+                )}
                 {!isDJPlaylist && (
                   <>
                     <MenuItem onClick={handleToggleShuffle}>
@@ -746,8 +975,8 @@ export default function NowPlaying({
                           {repeatMode === "off"
                             ? "Enable Repeat"
                             : repeatMode === "context"
-                            ? "Enable Repeat One"
-                            : "Disable Repeat"}
+                              ? "Enable Repeat One"
+                              : "Disable Repeat"}
                         </span>
                         {repeatMode === "track" ? (
                           <RepeatOneIcon
@@ -782,20 +1011,19 @@ export default function NowPlaying({
           </Menu>
         </div>
       </div>
-      </div>
       <div
         className={`fixed top-[4.5rem] transform transition-opacity duration-300 ${
           !volumeOverlayState.visible
             ? "hidden"
             : volumeOverlayState.animation === "showing"
-            ? "opacity-100 volumeInScale"
-            : volumeOverlayState.animation === "hiding"
-            ? "opacity-0 volumeOutScale"
-            : "hidden"
+              ? "opacity-100 volumeInScale"
+              : volumeOverlayState.animation === "hiding"
+                ? "opacity-0 volumeOutScale"
+                : "hidden"
         }`}
         style={{
-          right: '-6px',
-          zIndex: 50
+          right: "-6px",
+          zIndex: 50,
         }}
       >
         <div className="w-14 h-44 bg-slate-700/60 rounded-[17px] flex flex-col-reverse drop-shadow-xl overflow-hidden">
@@ -810,6 +1038,10 @@ export default function NowPlaying({
         </div>
       </div>
 
+      <ButtonMappingOverlay
+        show={showMappingOverlay}
+        activeButton={activeButton}
+      />
     </div>
   );
-};
+}

@@ -48,6 +48,7 @@ export const useLocalMedia = () => {
   // --- State for smooth, client-side UI updates ---
   const [clientPosition, setClientPosition] = useState(0);
   const [clientVolume, setClientVolume] = useState(null); // Optimistic volume updates
+  const [timestampSynced, setTimestampSynced] = useState(false); // Track if we've synced position after track change
   const clientVolumeTimerRef = useRef(null);
 
   const animationFrameRef = useRef(null);
@@ -119,9 +120,29 @@ export const useLocalMedia = () => {
       setIsConnected(false);
       setMediaState(null);
       setAlbumArtUrl(null);
+    } else if (data.type === 'media/timestamp_sync') {
+      // Handle timestamp sync for track changes
+      const { position_ms, new_timestamp_available } = data.payload;
+      
+      if (new_timestamp_available && !timestampSynced) {
+        console.log('Syncing timestamp after track change:', position_ms);
+        setClientPosition(position_ms || 0);
+        setTimestampSynced(true);
+        lastClientUpdateRef.current = Date.now();
+        
+        // Update server state position if we have it
+        if (lastServerStateRef.current) {
+          lastServerStateRef.current.position_ms = position_ms || 0;
+        }
+      }
     } else if (data.type === 'media/state_update') {
       const serverState = data.payload;
       const isTrackChange = lastServerStateRef.current?.track !== serverState.track;
+      
+      // Reset timestamp sync flag on track change
+      if (isTrackChange) {
+        setTimestampSynced(false);
+      }
       
       // Clear client volume override when server confirms
       setClientVolume(null);
@@ -143,7 +164,8 @@ export const useLocalMedia = () => {
       setMediaState(serverState);
 
       // If the track changed or we aren't seeking, sync the position.
-      if (isTrackChange || !isSeekingRef.current) {
+      // Skip position sync if we're waiting for timestamp_sync after track change
+      if (!isTrackChange && !isSeekingRef.current) {
         setClientPosition(serverState.position_ms || 0);
       }
       
