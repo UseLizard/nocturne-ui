@@ -2,7 +2,6 @@ import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react'
 import { useLocalMedia } from '../../hooks/useLocalMedia';
 import { useNavigation } from '../../hooks/useNavigation';
 import { useMediaScrollWheel } from '../../hooks/useScrollWheel';
-import { useGestureControls } from '../../hooks/useGestureControls';
 import { useGradientState } from '../../hooks/useGradientState';
 import ScrollingText from '../common/ScrollingText';
 import DoubleBufferedImage from '../common/DoubleBufferedImage';
@@ -152,10 +151,14 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     animation: "hidden"
   });
   const [showOptionsOverlay, setShowOptionsOverlay] = useState(false);
+  const [showPlaybackOverlay, setShowPlaybackOverlay] = useState(false);
+  const [shuffleEnabled, setShuffleEnabled] = useState(false);
+  const [repeatEnabled, setRepeatEnabled] = useState(false);
   
   const volumeTimerRef = useRef(null);
   const volumeLastAdjustedRef = useRef(0);
   const prevVolumeRef = useRef(null);
+  const lastClickTime = useRef(0);
   
   // Use local gradient state
   const [gradientState, setGradientState] = useGradientState('media');
@@ -249,13 +252,84 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     activeSection: "media",
   });
 
-  // Enable swipe gestures for track navigation
-  useGestureControls({
-    contentRef: contentContainerRef,
-    onSwipeLeft: handleSkipNext,
-    onSwipeRight: handleSkipPrevious,
-    isActive: true,
-  });
+  // Custom gesture controls with Y-position awareness
+  useEffect(() => {
+    const element = contentContainerRef?.current;
+    if (!element) return;
+
+    let touchStartX = null;
+    let touchStartY = null;
+    let startedBelowProgressBar = false;
+
+    const handleTouchStart = (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      
+      // Check if touch started below progress bar
+      // Progress bar is in the bottom section, roughly in the bottom 25% of screen
+      const screenHeight = window.innerHeight;
+      const progressBarThreshold = screenHeight * 0.75; // Bottom 25% of screen
+      startedBelowProgressBar = touchStartY > progressBarThreshold;
+    };
+
+    const handleTouchEnd = (e) => {
+      if (touchStartX === null || touchStartY === null) return;
+
+      const touchEndX = e.changedTouches[0].clientX;
+      const deltaX = touchStartX - touchEndX;
+      
+      // Only check horizontal distance, ignore vertical end position
+      // Lower threshold for more responsive swipes (20px instead of 30px)
+      const swipeThreshold = 20;
+      
+      // Determine if it's primarily a horizontal swipe based on initial movement
+      // We only care about the X delta being significant
+      if (Math.abs(deltaX) > swipeThreshold) {
+        if (startedBelowProgressBar) {
+          // Below progress bar: 30-second skips
+          if (deltaX > 0) {
+            handleSkipForward30s();
+          } else {
+            handleSkipBackward30s();
+          }
+        } else {
+          // Above progress bar: track navigation
+          if (deltaX > 0) {
+            handleSkipNext();
+          } else {
+            handleSkipPrevious();
+          }
+        }
+      }
+
+      touchStartX = null;
+      touchStartY = null;
+      startedBelowProgressBar = false;
+    };
+
+    // Prevent default on touchmove to avoid scrolling during swipe
+    const handleTouchMove = (e) => {
+      if (touchStartX === null) return;
+      
+      const touchX = e.touches[0].clientX;
+      const deltaX = touchStartX - touchX;
+      
+      // If horizontal movement is detected, prevent default
+      if (Math.abs(deltaX) > 10) {
+        e.preventDefault();
+      }
+    };
+
+    element.addEventListener('touchstart', handleTouchStart, { passive: true });
+    element.addEventListener('touchmove', handleTouchMove, { passive: false });
+    element.addEventListener('touchend', handleTouchEnd);
+
+    return () => {
+      element.removeEventListener('touchstart', handleTouchStart);
+      element.removeEventListener('touchmove', handleTouchMove);
+      element.removeEventListener('touchend', handleTouchEnd);
+    };
+  }, [handleSkipNext, handleSkipPrevious, handleSkipForward30s, handleSkipBackward30s]);
 
   // Update local gradient state when album art changes
   useEffect(() => {
@@ -270,13 +344,17 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     }
   }, [albumArtUrl, currentTrack, setGradientState, updateGradientColors]);
 
-  // Handle Enter key (scroll wheel button press) for play/pause
+  // Handle keyboard events
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && !showPlaybackOverlay) {
         e.preventDefault();
         e.stopPropagation();
         handlePlayPause();
+      } else if (e.key === 'Escape' && showPlaybackOverlay) {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowPlaybackOverlay(false);
       }
     };
 
@@ -285,7 +363,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [handlePlayPause]);
+  }, [handlePlayPause, showPlaybackOverlay]);
 
   // Show volume overlay with animation
   const showVolumeOverlay = useCallback(() => {
@@ -378,14 +456,57 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
       {/* Global Gradient Background */}
       <GradientBackground gradientState={gradientState} className="absolute inset-0 -z-10 bg-black" />
       
+      {/* Connection Status - Top Right */}
+      <div className="absolute top-4 right-4 z-20">
+        {isConnected ? (
+          <div className="flex items-center space-x-2 bg-black/30 px-3 py-1.5 rounded-full backdrop-blur-sm">
+            <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+            <span className="text-green-300 text-sm font-medium">Android connected</span>
+          </div>
+        ) : wsConnected ? (
+          <div className="flex items-center space-x-2 bg-black/30 px-3 py-1.5 rounded-full backdrop-blur-sm">
+            <div className="w-2 h-2 bg-yellow-400 rounded-full animate-pulse"></div>
+            <span className="text-yellow-300 text-sm font-medium">Waiting for Android</span>
+          </div>
+        ) : (
+          <div className="flex items-center space-x-2 bg-black/30 px-3 py-1.5 rounded-full backdrop-blur-sm">
+            <div className="w-2 h-2 bg-red-400 rounded-full"></div>
+            <span className="text-red-300 text-sm font-medium">Service disconnected</span>
+          </div>
+        )}
+      </div>
+      
       {/* Content wrapper for gesture controls */}
       <div ref={contentContainerRef} className="flex flex-col justify-between h-full w-full">
-        {/* Main Content Area */}
+        {/* Main Content Area - Clickable for play/pause, double-click for playback options */}
         <div 
           className="md:w-1/3 flex flex-row items-center px-12 pt-10 flex-1"
+          onClick={(e) => {
+            // Only trigger if not clicking on a button or interactive element
+            const isButton = e.target.tagName === 'BUTTON' || 
+                           e.target.closest('button') ||
+                           e.target.closest('[role="button"]') ||
+                           e.target.onclick;
+            
+            if (!isButton && isConnected && !loading) {
+              const currentTime = Date.now();
+              const timeSinceLastClick = currentTime - lastClickTime.current;
+              
+              if (timeSinceLastClick < 300) {
+                // Double click detected - show playback overlay
+                setShowPlaybackOverlay(true);
+              } else {
+                // Single click - play/pause
+                handlePlayPause();
+              }
+              
+              lastClickTime.current = currentTime;
+            }
+          }}
+          style={{ cursor: isConnected && !loading ? 'pointer' : 'default' }}
         >
         {/* Album Art - Blank Square */}
-        <div className="min-w-[280px] mr-8">
+        <div className="album-art-container min-w-[280px] mr-8">
           <div
             className="aspect-square rounded-[12px] drop-shadow-[0_8px_5px_rgba(0,0,0,0.25)] bg-white/10 flex items-center justify-center overflow-hidden"
             style={{ width: 280, height: 280 }}
@@ -415,9 +536,8 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
                   }
                 }}
                 fallback={
-                  <div className="text-center">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mb-2"></div>
-                    <div className="text-green-300 text-xs">Android Connected</div>
+                  <div className="flex items-center justify-center h-full">
+                    <BluetoothIcon className="w-16 h-16 text-green-400/30" />
                   </div>
                 }
                 transitionDuration={500}
@@ -466,16 +586,15 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
                 </button>
               </div>
             ) : (
-              <div className="text-center">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mb-2"></div>
-                <div className="text-green-300 text-xs">Android Connected</div>
+              <div className="flex items-center justify-center h-full">
+                <BluetoothIcon className="w-16 h-16 text-gray-600" />
               </div>
             )}
           </div>
         </div>
 
         {/* Track and Artist Info - Adapted for Song/Podcast Mode */}
-        <div className="flex-1 text-center md:text-left">
+        <div className="track-info-container flex-1 text-center md:text-left">
           <div className="max-w-[400px]">
             <ScrollingText
               text={currentTrack || (isConnected ? "No media playing" : "No device connected")}
@@ -574,7 +693,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
           {/* Skip Backward 30s - Always visible with proper styling */}
           <div 
             onClick={handleSkipBackward30s} 
-            className="mx-4 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
+            className="mx-8 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
             style={{ 
               WebkitAppearance: 'none', 
               MozAppearance: 'none', 
@@ -583,15 +702,15 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
               pointerEvents: loading || !isConnected ? 'none' : 'auto'
             }}
           >
-            <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
-              <span className="text-white text-sm font-bold">-30</span>
+            <div className="w-16 h-16 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+              <span className="text-white text-base font-bold">-30</span>
             </div>
           </div>
           
           {/* Play/Pause Button */}
           <div
             onClick={handlePlayPause}
-            className="transition-opacity duration-100 mx-12 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
+            className="transition-opacity duration-100 mx-4 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
             style={{ 
               WebkitAppearance: 'none', 
               MozAppearance: 'none', 
@@ -606,7 +725,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
           {/* Skip Forward 30s - Always visible with proper styling */}
           <div 
             onClick={handleSkipForward30s} 
-            className="mx-4 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
+            className="mx-8 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
             style={{ 
               WebkitAppearance: 'none', 
               MozAppearance: 'none', 
@@ -615,8 +734,8 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
               pointerEvents: loading || !isConnected ? 'none' : 'auto'
             }}
           >
-            <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
-              <span className="text-white text-sm font-bold">+30</span>
+            <div className="w-16 h-16 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+              <span className="text-white text-base font-bold">+30</span>
             </div>
           </div>
         </div>
@@ -646,6 +765,66 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
             <div className="w-2 h-2 bg-white/60 rounded-full animate-pulse"></div>
             <div className="w-2 h-2 bg-white/60 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
             <div className="w-2 h-2 bg-white/60 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+          </div>
+        </div>
+      )}
+
+      {/* Playback Options Overlay (Shuffle & Repeat) */}
+      {showPlaybackOverlay && (
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm"
+          onClick={(e) => {
+            // Close overlay if clicking on background
+            if (e.target === e.currentTarget) {
+              setShowPlaybackOverlay(false);
+            }
+          }}
+        >
+          <div className="flex flex-col items-center justify-center"
+               onClick={(e) => e.stopPropagation()}>
+            {/* Title */}
+            <h2 className="text-white text-2xl font-semibold mb-8">Playback Options</h2>
+            
+            {/* Toggle Buttons Container */}
+            <div className="flex gap-8">
+              {/* Shuffle Button */}
+              <button
+                onClick={() => setShuffleEnabled(!shuffleEnabled)}
+                className={`
+                  w-32 h-32 rounded-2xl flex flex-col items-center justify-center
+                  transition-all duration-200 transform active:scale-95
+                  ${shuffleEnabled 
+                    ? 'bg-white text-black shadow-lg shadow-white/20' 
+                    : 'bg-white/10 text-white hover:bg-white/20'}
+                `}
+              >
+                <ShuffleIcon className="w-16 h-16 mb-2" />
+                <span className="text-sm font-medium">Shuffle</span>
+              </button>
+              
+              {/* Repeat Button */}
+              <button
+                onClick={() => setRepeatEnabled(!repeatEnabled)}
+                className={`
+                  w-32 h-32 rounded-2xl flex flex-col items-center justify-center
+                  transition-all duration-200 transform active:scale-95
+                  ${repeatEnabled 
+                    ? 'bg-white text-black shadow-lg shadow-white/20' 
+                    : 'bg-white/10 text-white hover:bg-white/20'}
+                `}
+              >
+                <RepeatIcon className="w-16 h-16 mb-2" />
+                <span className="text-sm font-medium">Repeat</span>
+              </button>
+            </div>
+            
+            {/* Close button */}
+            <button
+              onClick={() => setShowPlaybackOverlay(false)}
+              className="mt-8 px-8 py-3 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors"
+            >
+              Done
+            </button>
           </div>
         </div>
       )}
