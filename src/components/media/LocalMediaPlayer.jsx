@@ -1,7 +1,7 @@
-import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useCallback, useState, useEffect, useMemo, memo } from 'react';
 import { useLocalMedia } from '../../hooks/useLocalMedia';
 import { useNavigation } from '../../hooks/useNavigation';
-import { useMediaScrollWheel } from '../../hooks/useScrollWheel';
+import { useGestureControls } from '../../hooks/useGestureControls';
 import { useGradientState } from '../../hooks/useGradientState';
 import ScrollingText from '../common/ScrollingText';
 import DoubleBufferedImage from '../common/DoubleBufferedImage';
@@ -24,8 +24,8 @@ import {
   RepeatIcon
 } from '../common/icons';
 
-// Progress Bar Component for Local Media (adapted from NowPlaying)
-const LocalMediaProgressBar = ({
+// Progress Bar Component for Local Media - Simplified without animations
+const LocalMediaProgressBar = memo(({
   progress,
   isPlaying,
   durationMs,
@@ -36,12 +36,64 @@ const LocalMediaProgressBar = ({
 }) => {
   const [isScrubbing, setIsScrubbing] = useState(false);
   const [scrubbingProgress, setScrubbingProgress] = useState(null);
+  const [isDragging, setIsDragging] = useState(false);
   const containerRef = useRef(null);
+  const progressBarRef = useRef(null);
 
-  const handleClick = () => {
-    setIsScrubbing(true);
-    onScrubbingChange?.(true);
+  const handleClick = (e) => {
+    if (!isDragging && progressBarRef.current) {
+      // Direct seek on click
+      const rect = progressBarRef.current.getBoundingClientRect();
+      const clickX = e.clientX - rect.left;
+      const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+      const seekMs = Math.floor((percentage / 100) * durationMs);
+      onSeek(seekMs);
+      updateProgress?.(seekMs);
+    } else {
+      // Old wheel-based scrubbing behavior
+      setIsScrubbing(true);
+      onScrubbingChange?.(true);
+    }
   };
+
+  const handleMouseDown = (e) => {
+    setIsDragging(true);
+    handleDrag(e);
+  };
+
+  const handleDrag = (e) => {
+    if (!progressBarRef.current) return;
+    const rect = progressBarRef.current.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+    setScrubbingProgress(percentage);
+  };
+
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e) => {
+      handleDrag(e);
+    };
+
+    const handleMouseUp = () => {
+      if (scrubbingProgress !== null) {
+        const seekMs = Math.floor((scrubbingProgress / 100) * durationMs);
+        onSeek(seekMs);
+        updateProgress?.(seekMs);
+      }
+      setIsDragging(false);
+      setScrubbingProgress(null);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isDragging, scrubbingProgress, durationMs, onSeek, updateProgress]);
 
   useEffect(() => {
     if (!isScrubbing) return;
@@ -109,19 +161,21 @@ const LocalMediaProgressBar = ({
   return (
     <div
       ref={containerRef}
-      className={`relative transition-all duration-200 ease-in-out ${isScrubbing ? "translate-y-8" : ""}`}
+      className={`relative transition-all duration-200 ease-in-out ${isScrubbing || isDragging ? "translate-y-8" : ""}`}
     >
       <div
-        className={`relative w-full bg-white/20 rounded-full overflow-hidden transition-all duration-300 ${isScrubbing ? "h-8" : "h-2 mt-4"}`}
+        ref={progressBarRef}
+        className={`relative w-full bg-white/20 rounded-full overflow-hidden transition-all duration-300 cursor-pointer ${isScrubbing || isDragging ? "h-8" : "h-2 mt-4"}`}
         onClick={handleClick}
+        onMouseDown={handleMouseDown}
       >
         <div
-          className="absolute inset-0 bg-white flex items-center justify-end transition-transform duration-0 ease-linear"
+          className="absolute left-0 top-0 h-full bg-white flex items-center justify-end"
           style={{
-            transform: `translateX(${finalProgress - 100}%)`,
+            width: `${finalProgress}%`,
           }}
         />
-        {isScrubbing && (
+        {(isScrubbing || isDragging) && (
           <div
             className="absolute inset-0 flex items-center"
             style={{
@@ -141,7 +195,15 @@ const LocalMediaProgressBar = ({
       </div>
     </div>
   );
-};
+});
+
+LocalMediaProgressBar.displayName = 'LocalMediaProgressBar';
+
+// Volume control configuration
+const VOLUME_MIN = 0;
+const VOLUME_MAX = 100;
+const VOLUME_STEP = Math.round(100 / 13); // ~7.69, rounded to 8 for 13 steps
+const VOLUME_STEPS = 13; // Number of discrete volume levels
 
 const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => {
   const containerRef = useRef(null);
@@ -151,14 +213,10 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     animation: "hidden"
   });
   const [showOptionsOverlay, setShowOptionsOverlay] = useState(false);
-  const [showPlaybackOverlay, setShowPlaybackOverlay] = useState(false);
-  const [shuffleEnabled, setShuffleEnabled] = useState(false);
-  const [repeatEnabled, setRepeatEnabled] = useState(false);
   
   const volumeTimerRef = useRef(null);
   const volumeLastAdjustedRef = useRef(0);
   const prevVolumeRef = useRef(null);
-  const lastClickTime = useRef(0);
   
   // Use local gradient state
   const [gradientState, setGradientState] = useGradientState('media');
@@ -206,10 +264,13 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
   }, [seekTo]);
 
   const handleVolumeChange = useCallback(async (volumePercent) => {
-    await setVolume(volumePercent);
+    // Round to nearest step for discrete volume control
+    const step = Math.round(volumePercent / VOLUME_STEP);
+    const roundedVolume = Math.max(VOLUME_MIN, Math.min(VOLUME_MAX, step * VOLUME_STEP));
+    await setVolume(roundedVolume);
   }, [setVolume]);
 
-  // Calculate progress percentage
+  // Calculate progress percentage - updates with position
   const progressPercentage = duration && position ? (position / duration) * 100 : 0;
 
   // Determine media mode based on track duration (>15 minutes = podcast mode)
@@ -252,84 +313,138 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     activeSection: "media",
   });
 
-  // Custom gesture controls with Y-position awareness
+  // Track tap timing for tap-to-play/pause and hold-to-seek
+  const touchStartTimeRef = useRef(null);
+  const touchStartPosRef = useRef(null);
+  const [isTapping, setIsTapping] = useState(false);
+  const [isHoldSeeking, setIsHoldSeeking] = useState(false);
+  const [holdSeekPosition, setHoldSeekPosition] = useState(null);
+  const holdTimerRef = useRef(null);
+  const initialHoldPositionRef = useRef(null);
+
+  // Enable swipe gestures for track navigation
+  useGestureControls({
+    contentRef: contentContainerRef,
+    onSwipeLeft: handleSkipNext,
+    onSwipeRight: handleSkipPrevious,
+    isActive: true,
+  });
+
+  // Add tap-to-play/pause and hold-to-seek functionality
   useEffect(() => {
     const element = contentContainerRef?.current;
     if (!element) return;
 
-    let touchStartX = null;
-    let touchStartY = null;
-    let startedBelowProgressBar = false;
-
     const handleTouchStart = (e) => {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
+      // Check if tap is on an interactive element
+      const target = e.target;
+      const isInteractive = target.closest('button') || 
+                           target.closest('[role="button"]');
       
-      // Check if touch started below progress bar
-      // Progress bar is in the bottom section, roughly in the bottom 25% of screen
-      const screenHeight = window.innerHeight;
-      const progressBarThreshold = screenHeight * 0.75; // Bottom 25% of screen
-      startedBelowProgressBar = touchStartY > progressBarThreshold;
+      if (!isInteractive) {
+        e.preventDefault(); // Prevent default touch behavior
+        touchStartTimeRef.current = Date.now();
+        touchStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        setIsTapping(true);
+        
+        // Set up hold timer for seeking overlay
+        holdTimerRef.current = setTimeout(() => {
+          console.log('Hold timer triggered, position:', position);
+          if (touchStartPosRef.current) {
+            initialHoldPositionRef.current = position;
+            setHoldSeekPosition(position);
+            setIsHoldSeeking(true);
+            setIsTapping(false);
+          }
+        }, 750);
+      }
+    };
+
+    const handleTouchMove = (e) => {
+      if (isHoldSeeking && initialHoldPositionRef.current !== null) {
+        const touch = e.touches[0];
+        const deltaX = touch.clientX - touchStartPosRef.current.x;
+        const screenWidth = window.innerWidth;
+        
+        // Calculate seek amount relative to track duration
+        // Full screen width = full track duration
+        const seekRatio = deltaX / screenWidth;
+        const seekDelta = seekRatio * duration;
+        const newPosition = Math.max(0, Math.min(duration, initialHoldPositionRef.current + seekDelta));
+        
+        setHoldSeekPosition(newPosition);
+      }
     };
 
     const handleTouchEnd = (e) => {
-      if (touchStartX === null || touchStartY === null) return;
+      // Clear hold timer
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
 
-      const touchEndX = e.changedTouches[0].clientX;
-      const deltaX = touchStartX - touchEndX;
-      
-      // Only check horizontal distance, ignore vertical end position
-      // Lower threshold for more responsive swipes (20px instead of 30px)
-      const swipeThreshold = 20;
-      
-      // Determine if it's primarily a horizontal swipe based on initial movement
-      // We only care about the X delta being significant
-      if (Math.abs(deltaX) > swipeThreshold) {
-        if (startedBelowProgressBar) {
-          // Below progress bar: 30-second skips
-          if (deltaX > 0) {
-            handleSkipForward30s();
-          } else {
-            handleSkipBackward30s();
-          }
-        } else {
-          // Above progress bar: track navigation
-          if (deltaX > 0) {
-            handleSkipNext();
-          } else {
-            handleSkipPrevious();
-          }
+      // Handle hold-to-seek release
+      if (isHoldSeeking) {
+        if (holdSeekPosition !== null) {
+          seekTo(holdSeekPosition);
         }
+        setIsHoldSeeking(false);
+        setHoldSeekPosition(null);
+        initialHoldPositionRef.current = null;
+        touchStartTimeRef.current = null;
+        touchStartPosRef.current = null;
+        setIsTapping(false);
+        return;
       }
 
-      touchStartX = null;
-      touchStartY = null;
-      startedBelowProgressBar = false;
-    };
+      // Handle tap-to-play/pause
+      if (!touchStartTimeRef.current || !touchStartPosRef.current || !isTapping) return;
 
-    // Prevent default on touchmove to avoid scrolling during swipe
-    const handleTouchMove = (e) => {
-      if (touchStartX === null) return;
-      
-      const touchX = e.touches[0].clientX;
-      const deltaX = touchStartX - touchX;
-      
-      // If horizontal movement is detected, prevent default
-      if (Math.abs(deltaX) > 10) {
-        e.preventDefault();
+      const touchDuration = Date.now() - touchStartTimeRef.current;
+      const touchEndPos = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+      const distance = Math.sqrt(
+        Math.pow(touchEndPos.x - touchStartPosRef.current.x, 2) +
+        Math.pow(touchEndPos.y - touchStartPosRef.current.y, 2)
+      );
+
+      // If touch duration < 200ms and movement < 10px, treat as tap
+      if (touchDuration < 200 && distance < 10) {
+        handlePlayPause();
       }
+
+      touchStartTimeRef.current = null;
+      touchStartPosRef.current = null;
+      setIsTapping(false);
     };
 
-    element.addEventListener('touchstart', handleTouchStart, { passive: true });
+    const handleTouchCancel = () => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+        holdTimerRef.current = null;
+      }
+      touchStartTimeRef.current = null;
+      touchStartPosRef.current = null;
+      setIsTapping(false);
+      setIsHoldSeeking(false);
+      setHoldSeekPosition(null);
+      initialHoldPositionRef.current = null;
+    };
+
+    element.addEventListener('touchstart', handleTouchStart, { passive: false });
     element.addEventListener('touchmove', handleTouchMove, { passive: false });
-    element.addEventListener('touchend', handleTouchEnd);
+    element.addEventListener('touchend', handleTouchEnd, { passive: false });
+    element.addEventListener('touchcancel', handleTouchCancel, { passive: false });
 
     return () => {
+      if (holdTimerRef.current) {
+        clearTimeout(holdTimerRef.current);
+      }
       element.removeEventListener('touchstart', handleTouchStart);
       element.removeEventListener('touchmove', handleTouchMove);
       element.removeEventListener('touchend', handleTouchEnd);
+      element.removeEventListener('touchcancel', handleTouchCancel);
     };
-  }, [handleSkipNext, handleSkipPrevious, handleSkipForward30s, handleSkipBackward30s]);
+  }, [handlePlayPause, isTapping, isHoldSeeking, position, duration, seekTo, holdSeekPosition]);
 
   // Update local gradient state when album art changes
   useEffect(() => {
@@ -344,17 +459,13 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     }
   }, [albumArtUrl, currentTrack, setGradientState, updateGradientColors]);
 
-  // Handle keyboard events
+  // Handle Enter key (scroll wheel button press) for play/pause
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Enter' && !showPlaybackOverlay) {
+      if (e.key === 'Enter') {
         e.preventDefault();
         e.stopPropagation();
         handlePlayPause();
-      } else if (e.key === 'Escape' && showPlaybackOverlay) {
-        e.preventDefault();
-        e.stopPropagation();
-        setShowPlaybackOverlay(false);
       }
     };
 
@@ -363,7 +474,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
     };
-  }, [handlePlayPause, showPlaybackOverlay]);
+  }, [handlePlayPause]);
 
   // Show volume overlay with animation
   const showVolumeOverlay = useCallback(() => {
@@ -390,7 +501,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
           animation: "hidden"
         });
       }, 300);
-    }, 1500);
+    }, 1000); // 1 second timeout
   }, []);
 
   // Cleanup volume timer
@@ -403,14 +514,41 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
   }, []);
 
 
-  // Unified scroll wheel for volume control (SPP mode)
-  const { manualVolumeChangeRef } = useMediaScrollWheel({
-    containerRef,
-    onVolumeChange: handleVolumeChange,
-    currentVolume: volume ?? 50,
-    showVolumeOverlay,
-    enabled: !loading && isConnected,
-  });
+  // Custom scroll wheel for configurable step volume control
+  useEffect(() => {
+    if (!isConnected || loading) return;
+    
+    const container = containerRef?.current;
+    if (!container) return;
+    
+    const handleWheel = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Determine scroll direction
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      const direction = delta > 0 ? 1 : -1; // Natural scrolling: down = decrease, up = increase
+      
+      // Calculate new volume based on steps
+      const currentStep = Math.round((volume ?? 50) / VOLUME_STEP);
+      const newStep = Math.max(0, Math.min(VOLUME_STEPS - 1, currentStep + direction));
+      const newVolume = newStep * VOLUME_STEP;
+      
+      if (newVolume !== volume) {
+        handleVolumeChange(newVolume);
+        showVolumeOverlay();
+      }
+    };
+    
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    
+    return () => {
+      container.removeEventListener('wheel', handleWheel);
+    };
+  }, [isConnected, loading, volume, handleVolumeChange, showVolumeOverlay]);
+  
+  // For compatibility with removed hook
+  const manualVolumeChangeRef = useRef(false);
   
   // Show volume overlay when volume changes manually
   useEffect(() => {
@@ -456,6 +594,21 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
       {/* Global Gradient Background */}
       <GradientBackground gradientState={gradientState} className="absolute inset-0 -z-10 bg-black" />
       
+      {/* Hold-to-seek Overlay */}
+      {isHoldSeeking && (
+        <div className="absolute inset-0 z-50 bg-black/60 flex flex-col items-center justify-center pointer-events-none">
+          <div className="text-white text-6xl font-bold mb-8">
+            {convertTimeToLength(holdSeekPosition || 0)}
+          </div>
+          <div className="relative w-full h-2 bg-white/20">
+            <div 
+              className="absolute left-0 top-0 h-full bg-white transition-all duration-100"
+              style={{ width: `${duration ? (holdSeekPosition / duration) * 100 : 0}%` }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Connection Status - Top Right */}
       <div className="absolute top-4 right-4 z-20">
         {isConnected ? (
@@ -478,37 +631,28 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
       
       {/* Content wrapper for gesture controls */}
       <div ref={contentContainerRef} className="flex flex-col justify-between h-full w-full">
-        {/* Main Content Area - Clickable for play/pause, double-click for playback options */}
+        {/* Main Content Area */}
         <div 
           className="md:w-1/3 flex flex-row items-center px-12 pt-10 flex-1"
-          onClick={(e) => {
-            // Only trigger if not clicking on a button or interactive element
-            const isButton = e.target.tagName === 'BUTTON' || 
-                           e.target.closest('button') ||
-                           e.target.closest('[role="button"]') ||
-                           e.target.onclick;
-            
-            if (!isButton && isConnected && !loading) {
-              const currentTime = Date.now();
-              const timeSinceLastClick = currentTime - lastClickTime.current;
-              
-              if (timeSinceLastClick < 300) {
-                // Double click detected - show playback overlay
-                setShowPlaybackOverlay(true);
-              } else {
-                // Single click - play/pause
-                handlePlayPause();
-              }
-              
-              lastClickTime.current = currentTime;
-            }
-          }}
-          style={{ cursor: isConnected && !loading ? 'pointer' : 'default' }}
         >
-        {/* Album Art - Blank Square */}
-        <div className="album-art-container min-w-[280px] mr-8">
+        {/* Album Art - With pre-baked shadow */}
+        <div className="min-w-[280px] mr-8 relative">
+          {/* Pre-baked shadow layer - always present */}
           <div
-            className="aspect-square rounded-[12px] drop-shadow-[0_8px_5px_rgba(0,0,0,0.25)] bg-white/10 flex items-center justify-center overflow-hidden"
+            className="absolute opacity-25 pointer-events-none"
+            style={{
+              width: 320,
+              height: 320,
+              top: '-20px',
+              left: '-20px',
+              backgroundImage: 'url(/images/album-shadow.webp)',
+              backgroundSize: 'contain',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'center'
+            }}
+          />
+          <div
+            className="aspect-square rounded-[12px] bg-white/10 flex items-center justify-center overflow-hidden relative"
             style={{ width: 280, height: 280 }}
           >
             {/* Debug info */}
@@ -536,8 +680,9 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
                   }
                 }}
                 fallback={
-                  <div className="flex items-center justify-center h-full">
-                    <BluetoothIcon className="w-16 h-16 text-green-400/30" />
+                  <div className="text-center">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mb-2"></div>
+                    <div className="text-green-300 text-xs">Android Connected</div>
                   </div>
                 }
                 transitionDuration={500}
@@ -586,19 +731,20 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
                 </button>
               </div>
             ) : (
-              <div className="flex items-center justify-center h-full">
-                <BluetoothIcon className="w-16 h-16 text-gray-600" />
+              <div className="text-center">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mb-2"></div>
+                <div className="text-green-300 text-xs">Android Connected</div>
               </div>
             )}
           </div>
         </div>
 
         {/* Track and Artist Info - Adapted for Song/Podcast Mode */}
-        <div className="track-info-container flex-1 text-center md:text-left">
+        <div className="flex-1 text-center md:text-left">
           <div className="max-w-[400px]">
             <ScrollingText
               text={currentTrack || (isConnected ? "No media playing" : "No device connected")}
-              className="text-[40px] font-[580] text-white tracking-tight"
+              className="text-4xl font-semibold text-white tracking-tight"
               maxWidth="400px"
               pauseDuration={1000}
               pixelsPerSecond={40}
@@ -693,7 +839,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
           {/* Skip Backward 30s - Always visible with proper styling */}
           <div 
             onClick={handleSkipBackward30s} 
-            className="mx-8 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
+            className="mx-4 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
             style={{ 
               WebkitAppearance: 'none', 
               MozAppearance: 'none', 
@@ -702,15 +848,15 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
               pointerEvents: loading || !isConnected ? 'none' : 'auto'
             }}
           >
-            <div className="w-16 h-16 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
-              <span className="text-white text-base font-bold">-30</span>
+            <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+              <span className="text-white text-sm font-bold">-30</span>
             </div>
           </div>
           
           {/* Play/Pause Button */}
           <div
             onClick={handlePlayPause}
-            className="transition-opacity duration-100 mx-4 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
+            className="transition-opacity duration-100 mx-12 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
             style={{ 
               WebkitAppearance: 'none', 
               MozAppearance: 'none', 
@@ -725,7 +871,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
           {/* Skip Forward 30s - Always visible with proper styling */}
           <div 
             onClick={handleSkipForward30s} 
-            className="mx-8 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
+            className="mx-4 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
             style={{ 
               WebkitAppearance: 'none', 
               MozAppearance: 'none', 
@@ -734,8 +880,8 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
               pointerEvents: loading || !isConnected ? 'none' : 'auto'
             }}
           >
-            <div className="w-16 h-16 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
-              <span className="text-white text-base font-bold">+30</span>
+            <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
+              <span className="text-white text-sm font-bold">+30</span>
             </div>
           </div>
         </div>
@@ -758,73 +904,13 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
       </div>
       </div>
 
-      {/* Loading Indicator */}
+      {/* Loading Indicator - Moved to top-left */}
       {loading && (
-        <div className="flex items-center justify-center py-4">
-          <div className="flex items-center space-x-2">
+        <div className="absolute top-4 left-4 z-20">
+          <div className="flex items-center space-x-1 bg-black/30 px-3 py-1.5 rounded-full">
             <div className="w-2 h-2 bg-white/60 rounded-full animate-pulse"></div>
             <div className="w-2 h-2 bg-white/60 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
             <div className="w-2 h-2 bg-white/60 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-          </div>
-        </div>
-      )}
-
-      {/* Playback Options Overlay (Shuffle & Repeat) */}
-      {showPlaybackOverlay && (
-        <div 
-          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm"
-          onClick={(e) => {
-            // Close overlay if clicking on background
-            if (e.target === e.currentTarget) {
-              setShowPlaybackOverlay(false);
-            }
-          }}
-        >
-          <div className="flex flex-col items-center justify-center"
-               onClick={(e) => e.stopPropagation()}>
-            {/* Title */}
-            <h2 className="text-white text-2xl font-semibold mb-8">Playback Options</h2>
-            
-            {/* Toggle Buttons Container */}
-            <div className="flex gap-8">
-              {/* Shuffle Button */}
-              <button
-                onClick={() => setShuffleEnabled(!shuffleEnabled)}
-                className={`
-                  w-32 h-32 rounded-2xl flex flex-col items-center justify-center
-                  transition-all duration-200 transform active:scale-95
-                  ${shuffleEnabled 
-                    ? 'bg-white text-black shadow-lg shadow-white/20' 
-                    : 'bg-white/10 text-white hover:bg-white/20'}
-                `}
-              >
-                <ShuffleIcon className="w-16 h-16 mb-2" />
-                <span className="text-sm font-medium">Shuffle</span>
-              </button>
-              
-              {/* Repeat Button */}
-              <button
-                onClick={() => setRepeatEnabled(!repeatEnabled)}
-                className={`
-                  w-32 h-32 rounded-2xl flex flex-col items-center justify-center
-                  transition-all duration-200 transform active:scale-95
-                  ${repeatEnabled 
-                    ? 'bg-white text-black shadow-lg shadow-white/20' 
-                    : 'bg-white/10 text-white hover:bg-white/20'}
-                `}
-              >
-                <RepeatIcon className="w-16 h-16 mb-2" />
-                <span className="text-sm font-medium">Repeat</span>
-              </button>
-            </div>
-            
-            {/* Close button */}
-            <button
-              onClick={() => setShowPlaybackOverlay(false)}
-              className="mt-8 px-8 py-3 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors"
-            >
-              Done
-            </button>
           </div>
         </div>
       )}
@@ -886,30 +972,29 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
         </div>
       )}
       
-      {/* Volume Overlay */}
+      {/* Horizontal Volume Bar Overlay */}
       <div
-        className={`fixed top-[4.5rem] transform transition-opacity duration-300 ${
+        className={`fixed bottom-8 left-1/2 transform -translate-x-1/2 transition-opacity duration-200 ${
           !volumeOverlayState.visible
-            ? "hidden"
+            ? "opacity-0 pointer-events-none"
             : volumeOverlayState.animation === "showing"
-            ? "opacity-100 volumeInScale"
+            ? "opacity-100"
             : volumeOverlayState.animation === "hiding"
-            ? "opacity-0 volumeOutScale"
-            : "hidden"
+            ? "opacity-0"
+            : "opacity-0 pointer-events-none"
         }`}
         style={{
-          right: '-6px',
-          zIndex: 50
+          zIndex: 50,
+          width: '70%'
         }}
       >
-        <div className="w-14 h-44 bg-slate-700/60 rounded-[17px] flex flex-col-reverse drop-shadow-xl overflow-hidden">
-          <div
-            className="bg-white w-full transition-height duration-300 rounded-b-[13px]"
-            style={{ height: `${volume || 50}%` }}
-          >
-            <div className="absolute bottom-0 left-0 right-0 flex justify-center items-center h-6 pb-7">
-              {VolumeIcon}
-            </div>
+        <div className="bg-black/80 rounded-lg px-4 py-2">
+          {/* Volume Bar */}
+          <div className="relative w-full h-2 bg-white/20 rounded-full overflow-hidden">
+            <div
+              className="absolute left-0 top-0 h-full bg-white rounded-full transition-all duration-200"
+              style={{ width: `${volume ?? 50}%` }}
+            />
           </div>
         </div>
       </div>
