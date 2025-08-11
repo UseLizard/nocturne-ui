@@ -213,6 +213,13 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     animation: "hidden"
   });
   const [showOptionsOverlay, setShowOptionsOverlay] = useState(false);
+  const [scrubbingMode, setScrubbingMode] = useState(false);
+  const [scrubbingPosition, setScrubbingPosition] = useState(null);
+  const scrubbingTimeoutRef = useRef(null);
+  const lastScrollTimeRef = useRef(0);
+  const scrollAccumulatorRef = useRef(0);
+  const scrollWheelHoldTimerRef = useRef(null);
+  const scrollWheelPressedRef = useRef(false);
   
   const volumeTimerRef = useRef(null);
   const volumeLastAdjustedRef = useRef(0);
@@ -313,14 +320,10 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     activeSection: "media",
   });
 
-  // Track tap timing for tap-to-play/pause and hold-to-seek
+  // Track tap timing for tap-to-play/pause
   const touchStartTimeRef = useRef(null);
   const touchStartPosRef = useRef(null);
   const [isTapping, setIsTapping] = useState(false);
-  const [isHoldSeeking, setIsHoldSeeking] = useState(false);
-  const [holdSeekPosition, setHoldSeekPosition] = useState(null);
-  const holdTimerRef = useRef(null);
-  const initialHoldPositionRef = useRef(null);
 
   // Enable swipe gestures for track navigation
   useGestureControls({
@@ -330,7 +333,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     isActive: true,
   });
 
-  // Add tap-to-play/pause and hold-to-seek functionality
+  // Add tap-to-play/pause functionality and handle scrubbing mode exit on tap
   useEffect(() => {
     const element = contentContainerRef?.current;
     if (!element) return;
@@ -346,51 +349,23 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
         touchStartTimeRef.current = Date.now();
         touchStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
         setIsTapping(true);
-        
-        // Set up hold timer for seeking overlay
-        holdTimerRef.current = setTimeout(() => {
-          console.log('Hold timer triggered, position:', position);
-          if (touchStartPosRef.current) {
-            initialHoldPositionRef.current = position;
-            setHoldSeekPosition(position);
-            setIsHoldSeeking(true);
-            setIsTapping(false);
-          }
-        }, 750);
-      }
-    };
-
-    const handleTouchMove = (e) => {
-      if (isHoldSeeking && initialHoldPositionRef.current !== null) {
-        const touch = e.touches[0];
-        const deltaX = touch.clientX - touchStartPosRef.current.x;
-        const screenWidth = window.innerWidth;
-        
-        // Calculate seek amount relative to track duration
-        // Full screen width = full track duration
-        const seekRatio = deltaX / screenWidth;
-        const seekDelta = seekRatio * duration;
-        const newPosition = Math.max(0, Math.min(duration, initialHoldPositionRef.current + seekDelta));
-        
-        setHoldSeekPosition(newPosition);
       }
     };
 
     const handleTouchEnd = (e) => {
-      // Clear hold timer
-      if (holdTimerRef.current) {
-        clearTimeout(holdTimerRef.current);
-        holdTimerRef.current = null;
-      }
-
-      // Handle hold-to-seek release
-      if (isHoldSeeking) {
-        if (holdSeekPosition !== null) {
-          seekTo(holdSeekPosition);
+      // Exit scrubbing mode if in scrubbing mode
+      if (scrubbingMode) {
+        setScrubbingPosition(currentPos => {
+          if (currentPos !== null) {
+            seekTo(currentPos);
+          }
+          return null;
+        });
+        setScrubbingMode(false);
+        if (scrubbingTimeoutRef.current) {
+          clearTimeout(scrubbingTimeoutRef.current);
+          scrubbingTimeoutRef.current = null;
         }
-        setIsHoldSeeking(false);
-        setHoldSeekPosition(null);
-        initialHoldPositionRef.current = null;
         touchStartTimeRef.current = null;
         touchStartPosRef.current = null;
         setIsTapping(false);
@@ -418,33 +393,21 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     };
 
     const handleTouchCancel = () => {
-      if (holdTimerRef.current) {
-        clearTimeout(holdTimerRef.current);
-        holdTimerRef.current = null;
-      }
       touchStartTimeRef.current = null;
       touchStartPosRef.current = null;
       setIsTapping(false);
-      setIsHoldSeeking(false);
-      setHoldSeekPosition(null);
-      initialHoldPositionRef.current = null;
     };
 
     element.addEventListener('touchstart', handleTouchStart, { passive: false });
-    element.addEventListener('touchmove', handleTouchMove, { passive: false });
     element.addEventListener('touchend', handleTouchEnd, { passive: false });
     element.addEventListener('touchcancel', handleTouchCancel, { passive: false });
 
     return () => {
-      if (holdTimerRef.current) {
-        clearTimeout(holdTimerRef.current);
-      }
       element.removeEventListener('touchstart', handleTouchStart);
-      element.removeEventListener('touchmove', handleTouchMove);
       element.removeEventListener('touchend', handleTouchEnd);
       element.removeEventListener('touchcancel', handleTouchCancel);
     };
-  }, [handlePlayPause, isTapping, isHoldSeeking, position, duration, seekTo, holdSeekPosition]);
+  }, [handlePlayPause, isTapping, scrubbingMode, seekTo]);
 
   // Update local gradient state when album art changes
   useEffect(() => {
@@ -459,22 +422,82 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     }
   }, [albumArtUrl, currentTrack, setGradientState, updateGradientColors]);
 
-  // Handle Enter key (scroll wheel button press) for play/pause
+  // Handle Enter key (scroll wheel button press) for play/pause or hold for scrubbing
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
         e.stopPropagation();
-        handlePlayPause();
+        
+        if (scrubbingMode) {
+          // Already in scrubbing mode, exit on release
+          return;
+        }
+        
+        // Start hold timer for scrubbing mode
+        scrollWheelPressedRef.current = true;
+        
+        if (scrollWheelHoldTimerRef.current) {
+          clearTimeout(scrollWheelHoldTimerRef.current);
+        }
+        
+        scrollWheelHoldTimerRef.current = setTimeout(() => {
+          if (scrollWheelPressedRef.current) {
+            // Enter scrubbing mode after hold
+            setScrubbingMode(true);
+            setScrubbingPosition(position);
+            scrollAccumulatorRef.current = 0;
+            lastScrollTimeRef.current = Date.now();
+          }
+        }, 500); // 500ms hold to enter scrubbing mode
+      }
+    };
+    
+    const handleKeyUp = (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        const wasPressed = scrollWheelPressedRef.current;
+        scrollWheelPressedRef.current = false;
+        
+        // Clear hold timer
+        if (scrollWheelHoldTimerRef.current) {
+          clearTimeout(scrollWheelHoldTimerRef.current);
+          scrollWheelHoldTimerRef.current = null;
+        }
+        
+        if (scrubbingMode) {
+          // Exit scrubbing mode and apply seek
+          setScrubbingPosition(currentPos => {
+            if (currentPos !== null) {
+              seekTo(currentPos);
+            }
+            return null;
+          });
+          setScrubbingMode(false);
+          if (scrubbingTimeoutRef.current) {
+            clearTimeout(scrubbingTimeoutRef.current);
+            scrubbingTimeoutRef.current = null;
+          }
+        } else if (wasPressed) {
+          // Quick press - play/pause
+          handlePlayPause();
+        }
       }
     };
 
     document.addEventListener('keydown', handleKeyDown, true);
+    document.addEventListener('keyup', handleKeyUp, true);
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
+      document.removeEventListener('keyup', handleKeyUp, true);
+      if (scrollWheelHoldTimerRef.current) {
+        clearTimeout(scrollWheelHoldTimerRef.current);
+      }
     };
-  }, [handlePlayPause]);
+  }, [scrubbingMode, position, seekTo, handlePlayPause]);
 
   // Show volume overlay with animation
   const showVolumeOverlay = useCallback(() => {
@@ -514,7 +537,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
   }, []);
 
 
-  // Custom scroll wheel for configurable step volume control
+  // Custom scroll wheel for volume control or scrubbing based on mode
   useEffect(() => {
     if (!isConnected || loading) return;
     
@@ -525,18 +548,65 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
       e.preventDefault();
       e.stopPropagation();
       
-      // Determine scroll direction
-      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-      const direction = delta > 0 ? 1 : -1; // Natural scrolling: down = decrease, up = increase
-      
-      // Calculate new volume based on steps
-      const currentStep = Math.round((volume ?? 50) / VOLUME_STEP);
-      const newStep = Math.max(0, Math.min(VOLUME_STEPS - 1, currentStep + direction));
-      const newVolume = newStep * VOLUME_STEP;
-      
-      if (newVolume !== volume) {
-        handleVolumeChange(newVolume);
-        showVolumeOverlay();
+      if (scrubbingMode) {
+        // Scrubbing mode - use scroll wheel for seeking
+        const now = Date.now();
+        const timeSinceLastScroll = now - lastScrollTimeRef.current;
+        lastScrollTimeRef.current = now;
+        
+        // Determine scroll direction and magnitude
+        const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        const direction = delta > 0 ? -1 : 1; // Reverse for seeking: down = backward, up = forward
+        
+        // Calculate scroll speed factor (rapid scrolling = bigger jumps)
+        const speedFactor = timeSinceLastScroll < 50 ? 3 : timeSinceLastScroll < 100 ? 2 : 1;
+        
+        // Base step is proportional to track duration
+        // For a 3-minute song: ~1 second per tick
+        // For a 30-minute podcast: ~10 seconds per tick
+        const baseStep = duration ? (duration / 180) : 1000; // Default 1 second if no duration
+        const step = baseStep * speedFactor * direction;
+        
+        // Accumulate scroll for smoother seeking
+        scrollAccumulatorRef.current += step;
+        
+        // Apply accumulated scroll
+        const currentPos = scrubbingPosition ?? position;
+        const newPosition = Math.max(0, Math.min(duration || 0, currentPos + scrollAccumulatorRef.current));
+        
+        if (newPosition !== scrubbingPosition) {
+          setScrubbingPosition(newPosition);
+          scrollAccumulatorRef.current = 0; // Reset accumulator after applying
+          
+          // Reset timeout for auto-exit
+          if (scrubbingTimeoutRef.current) {
+            clearTimeout(scrubbingTimeoutRef.current);
+          }
+          scrubbingTimeoutRef.current = setTimeout(() => {
+            // Use refs to get current state values
+            setScrubbingPosition(currentPos => {
+              if (currentPos !== null) {
+                seekTo(currentPos);
+              }
+              return null;
+            });
+            setScrubbingMode(false);
+          }, 2000);
+        }
+      } else {
+        // Volume mode - existing volume control logic
+        const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+        const direction = delta > 0 ? 1 : -1; // Natural scrolling: down = decrease, up = increase
+        
+        // Calculate new volume based on steps
+        const currentStep = Math.round((volume ?? 50) / VOLUME_STEP);
+        const newStep = Math.max(0, Math.min(VOLUME_STEPS - 1, currentStep + direction));
+        const newVolume = newStep * VOLUME_STEP;
+        
+        if (newVolume !== volume) {
+          handleVolumeChange(newVolume);
+          showVolumeOverlay();
+        }
       }
     };
     
@@ -545,7 +615,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     return () => {
       container.removeEventListener('wheel', handleWheel);
     };
-  }, [isConnected, loading, volume, handleVolumeChange, showVolumeOverlay]);
+  }, [isConnected, loading, volume, handleVolumeChange, showVolumeOverlay, scrubbingMode, position, duration, seekTo]);
   
   // For compatibility with removed hook
   const manualVolumeChangeRef = useRef(false);
@@ -594,16 +664,16 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
       {/* Global Gradient Background */}
       <GradientBackground gradientState={gradientState} className="absolute inset-0 -z-10 bg-black" />
       
-      {/* Hold-to-seek Overlay */}
-      {isHoldSeeking && (
+      {/* Scrubbing Mode Overlay */}
+      {scrubbingMode && (
         <div className="absolute inset-0 z-50 bg-black/60 flex flex-col items-center justify-center pointer-events-none">
           <div className="text-white text-6xl font-bold mb-8">
-            {convertTimeToLength(holdSeekPosition || 0)}
+            {convertTimeToLength(scrubbingPosition || 0)}
           </div>
           <div className="relative w-full h-2 bg-white/20">
             <div 
               className="absolute left-0 top-0 h-full bg-white transition-all duration-100"
-              style={{ width: `${duration ? (holdSeekPosition / duration) * 100 : 0}%` }}
+              style={{ width: `${duration ? (scrubbingPosition / duration) * 100 : 0}%` }}
             />
           </div>
         </div>
@@ -837,7 +907,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
         {/* Playback Controls - Enhanced based on mode */}
         <div className="flex justify-center items-center flex-1">
           {/* Skip Backward 30s - Always visible with proper styling */}
-          <div 
+          <button 
             onClick={handleSkipBackward30s} 
             className="mx-4 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
             style={{ 
@@ -847,14 +917,16 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
               opacity: loading || !isConnected ? 0.5 : 1,
               pointerEvents: loading || !isConnected ? 'none' : 'auto'
             }}
+            role="button"
+            aria-label="Skip backward 30 seconds"
           >
             <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
               <span className="text-white text-sm font-bold">-30</span>
             </div>
-          </div>
+          </button>
           
           {/* Play/Pause Button */}
-          <div
+          <button
             onClick={handlePlayPause}
             className="transition-opacity duration-100 mx-12 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
             style={{ 
@@ -864,12 +936,14 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
               opacity: loading || !isConnected ? 0.5 : 1,
               pointerEvents: loading || !isConnected ? 'none' : 'auto'
             }}
+            role="button"
+            aria-label={isPlaying ? "Pause" : "Play"}
           >
             <PlayPauseIcon />
-          </div>
+          </button>
 
           {/* Skip Forward 30s - Always visible with proper styling */}
-          <div 
+          <button 
             onClick={handleSkipForward30s} 
             className="mx-4 focus:outline-none outline-none border-none bg-transparent appearance-none disabled:opacity-50"
             style={{ 
@@ -879,11 +953,13 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
               opacity: loading || !isConnected ? 0.5 : 1,
               pointerEvents: loading || !isConnected ? 'none' : 'auto'
             }}
+            role="button"
+            aria-label="Skip forward 30 seconds"
           >
             <div className="w-14 h-14 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors">
               <span className="text-white text-sm font-bold">+30</span>
             </div>
-          </div>
+          </button>
         </div>
 
         {/* Right Side - Options Menu */}
