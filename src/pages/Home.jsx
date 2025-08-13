@@ -5,7 +5,8 @@ import Settings from "../components/settings/Settings";
 import LocalMediaPlayer from "../components/media/LocalMediaPlayer";
 import BluetoothMainBLE from "../components/bluetooth/BluetoothMainBLE";
 import AlbumArtGallery from "../components/albumart/AlbumArtGallery";
-import AlbumArtTest from "../components/AlbumArtTest";
+import TestHub from "../components/test/TestHub";
+import TimeSync from "../components/timesync/TimeSync";
 import { useGradientState } from "../hooks/useGradientState";
 import { useNavigation } from "../hooks/useNavigation";
 import { useSpotifyPlayerControls } from "../hooks/useSpotifyPlayerControls";
@@ -76,6 +77,8 @@ export default function Home({
       updateGradientColors(null, "bluetooth");
     } else if (activeSection === "albumart") {
       updateGradientColors(null, "albumart");
+    } else if (activeSection === "timesync") {
+      updateGradientColors(null, "timesync");
     }
   }, [
     activeSection,
@@ -785,8 +788,10 @@ export default function Home({
         return <BluetoothMainBLE setActiveSection={setActiveSection} />;
       case "albumart":
         return <AlbumArtGallery setActiveSection={setActiveSection} />;
+      case "timesync":
+        return <TimeSync setActiveSection={setActiveSection} />;
       case "test":
-        return <AlbumArtTest />;
+        return <TestHub />;
       default:
         return (
           <div className="flex items-center justify-center h-full text-white/50 text-2xl">
@@ -796,8 +801,8 @@ export default function Home({
     }
   };
 
-  // Render media, bluetooth, albumart, and test sections as full-screen like NowPlaying
-  if (activeSection === "media" || activeSection === "bluetooth" || activeSection === "albumart" || activeSection === "test") {
+  // Render media, bluetooth, albumart, timesync, and test sections as full-screen like NowPlaying
+  if (activeSection === "media" || activeSection === "bluetooth" || activeSection === "albumart" || activeSection === "timesync" || activeSection === "test") {
     return (
       <div className="relative min-h-screen">
         {renderContent()}

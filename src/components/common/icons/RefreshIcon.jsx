@@ -1,3 +1,5 @@
+import React from 'react';
+
 const RefreshIcon = ({ className }) => (
   <svg
     className={className}

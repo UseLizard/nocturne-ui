@@ -75,3 +75,5 @@ export { default as ChevronDownIcon } from "./ChevronDownIcon";
 export { default as ClockIcon } from "./ClockIcon";
 export { default as FilterIcon } from "./FilterIcon";
 export { default as TrashIcon } from "./TrashIcon";
+export { default as SunIcon } from "./SunIcon";
+export { default as MoonIcon } from "./MoonIcon";

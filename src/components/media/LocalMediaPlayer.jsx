@@ -15,9 +15,6 @@ import {
   SkipBackwardIcon,
   BackIcon,
   ForwardIcon,
-  VolumeLoudIcon,
-  VolumeLowIcon,
-  VolumeOffIcon,
   MenuIcon,
   HeartIcon,
   ShuffleIcon,
@@ -216,10 +213,11 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
   const [scrubbingMode, setScrubbingMode] = useState(false);
   const [scrubbingPosition, setScrubbingPosition] = useState(null);
   const scrubbingTimeoutRef = useRef(null);
-  const lastScrollTimeRef = useRef(0);
-  const scrollAccumulatorRef = useRef(0);
-  const scrollWheelHoldTimerRef = useRef(null);
-  const scrollWheelPressedRef = useRef(false);
+  const scrubbingStartPositionRef = useRef(null);
+  const lastSeekTimeRef = useRef(0);
+  const [debouncedIsPlaying, setDebouncedIsPlaying] = useState(false);
+  const lastVolumeChangeTimeRef = useRef(0);
+  const [debouncedVolume, setDebouncedVolume] = useState(50);
   
   const volumeTimerRef = useRef(null);
   const volumeLastAdjustedRef = useRef(0);
@@ -275,6 +273,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     const step = Math.round(volumePercent / VOLUME_STEP);
     const roundedVolume = Math.max(VOLUME_MIN, Math.min(VOLUME_MAX, step * VOLUME_STEP));
     await setVolume(roundedVolume);
+    lastVolumeChangeTimeRef.current = Date.now(); // Mark volume change time
   }, [setVolume]);
 
   // Calculate progress percentage - updates with position
@@ -358,10 +357,12 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
         setScrubbingPosition(currentPos => {
           if (currentPos !== null) {
             seekTo(currentPos);
+            lastSeekTimeRef.current = Date.now(); // Mark seek time
           }
           return null;
         });
         setScrubbingMode(false);
+        scrubbingStartPositionRef.current = null;
         if (scrubbingTimeoutRef.current) {
           clearTimeout(scrubbingTimeoutRef.current);
           scrubbingTimeoutRef.current = null;
@@ -420,69 +421,75 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
         updateGradientColors(albumArtUrl, 'media');
       }
     }
-  }, [albumArtUrl, currentTrack, setGradientState, updateGradientColors]);
+  }, [albumArtUrl, setGradientState, updateGradientColors]);
+
+  // Debounce isPlaying state to prevent flicker after seeking
+  useEffect(() => {
+    const now = Date.now();
+    const timeSinceLastSeek = now - lastSeekTimeRef.current;
+    
+    // If no seek has happened yet (initialization), or enough time has passed, update immediately
+    if (lastSeekTimeRef.current === 0 || timeSinceLastSeek >= 333) {
+      setDebouncedIsPlaying(isPlaying);
+    }
+  }, [isPlaying]);
+
+  // Debounce volume state to prevent flicker after volume changes
+  useEffect(() => {
+    const now = Date.now();
+    const timeSinceLastVolumeChange = now - lastVolumeChangeTimeRef.current;
+    
+    // If no volume change has happened yet (initialization), or enough time has passed, update immediately
+    if (lastVolumeChangeTimeRef.current === 0 || timeSinceLastVolumeChange >= 200) {
+      setDebouncedVolume(volume ?? 50);
+    }
+  }, [volume]);
 
   // Handle Enter key (scroll wheel button press) for play/pause or hold for scrubbing
   useEffect(() => {
     const handleKeyDown = (e) => {
-      if (e.key === 'Enter') {
+      if (e.key === '1') {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (!scrubbingMode) {
+          // Enter scrubbing mode immediately when pressing "1"
+          setScrubbingMode(true);
+          setScrubbingPosition(position);
+          scrubbingStartPositionRef.current = position;
+        }
+      } else if (e.key === 'Enter') {
         e.preventDefault();
         e.stopPropagation();
         
         if (scrubbingMode) {
-          // Already in scrubbing mode, exit on release
+          // Already in scrubbing mode, don't do anything on keydown
           return;
         }
         
-        // Start hold timer for scrubbing mode
-        scrollWheelPressedRef.current = true;
-        
-        if (scrollWheelHoldTimerRef.current) {
-          clearTimeout(scrollWheelHoldTimerRef.current);
-        }
-        
-        scrollWheelHoldTimerRef.current = setTimeout(() => {
-          if (scrollWheelPressedRef.current) {
-            // Enter scrubbing mode after hold
-            setScrubbingMode(true);
-            setScrubbingPosition(position);
-            scrollAccumulatorRef.current = 0;
-            lastScrollTimeRef.current = Date.now();
-          }
-        }, 500); // 500ms hold to enter scrubbing mode
+        // Just play/pause on Enter press when not scrubbing
+        handlePlayPause();
       }
     };
     
     const handleKeyUp = (e) => {
-      if (e.key === 'Enter') {
+      if (e.key === 'Enter' && scrubbingMode) {
         e.preventDefault();
         e.stopPropagation();
         
-        const wasPressed = scrollWheelPressedRef.current;
-        scrollWheelPressedRef.current = false;
-        
-        // Clear hold timer
-        if (scrollWheelHoldTimerRef.current) {
-          clearTimeout(scrollWheelHoldTimerRef.current);
-          scrollWheelHoldTimerRef.current = null;
-        }
-        
-        if (scrubbingMode) {
-          // Exit scrubbing mode and apply seek
-          setScrubbingPosition(currentPos => {
-            if (currentPos !== null) {
-              seekTo(currentPos);
-            }
-            return null;
-          });
-          setScrubbingMode(false);
-          if (scrubbingTimeoutRef.current) {
-            clearTimeout(scrubbingTimeoutRef.current);
-            scrubbingTimeoutRef.current = null;
+        // Exit scrubbing mode and apply seek
+        setScrubbingPosition(currentPos => {
+          if (currentPos !== null) {
+            seekTo(currentPos);
+            lastSeekTimeRef.current = Date.now(); // Mark seek time
           }
-        } else if (wasPressed) {
-          // Quick press - play/pause
-          handlePlayPause();
+          return null;
+        });
+        setScrubbingMode(false);
+        scrubbingStartPositionRef.current = null;
+        if (scrubbingTimeoutRef.current) {
+          clearTimeout(scrubbingTimeoutRef.current);
+          scrubbingTimeoutRef.current = null;
         }
       }
     };
@@ -493,9 +500,6 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('keyup', handleKeyUp, true);
-      if (scrollWheelHoldTimerRef.current) {
-        clearTimeout(scrollWheelHoldTimerRef.current);
-      }
     };
   }, [scrubbingMode, position, seekTo, handlePlayPause]);
 
@@ -549,50 +553,59 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
       e.stopPropagation();
       
       if (scrubbingMode) {
-        // Scrubbing mode - use scroll wheel for seeking
-        const now = Date.now();
-        const timeSinceLastScroll = now - lastScrollTimeRef.current;
-        lastScrollTimeRef.current = now;
-        
-        // Determine scroll direction and magnitude
+        // Scrubbing with dynamic steps and natural direction
         const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
-        const direction = delta > 0 ? -1 : 1; // Reverse for seeking: down = backward, up = forward
+        const direction = Math.sign(delta); // Natural direction: positive delta (down/right) seeks forward
+
+        // Dynamic step size based on scroll intensity for more intuitive scrubbing.
+        const scrollIntensity = Math.abs(delta);
+        let stepMs;
+
+        if (duration && duration > 900000) { // For tracks over 15 mins (podcasts)
+          if (scrollIntensity < 20) {
+            stepMs = 15000; // 15s for fine control
+          } else if (scrollIntensity < 50) {
+            stepMs = 30000; // 30s for medium scroll
+          } else {
+            stepMs = 60000; // 60s for fast scroll
+          }
+        } else { // For tracks under 15 mins (songs)
+          if (scrollIntensity < 20) {
+            stepMs = 1000; // 1s for fine control
+          } else if (scrollIntensity < 50) {
+            stepMs = 5000; // 5s for medium scroll
+          } else {
+            stepMs = 10000; // 10s for fast scroll
+          }
+        }
         
-        // Calculate scroll speed factor (rapid scrolling = bigger jumps)
-        const speedFactor = timeSinceLastScroll < 50 ? 3 : timeSinceLastScroll < 100 ? 2 : 1;
+        const seekStep = stepMs * direction;
         
-        // Base step is proportional to track duration
-        // For a 3-minute song: ~1 second per tick
-        // For a 30-minute podcast: ~10 seconds per tick
-        const baseStep = duration ? (duration / 180) : 1000; // Default 1 second if no duration
-        const step = baseStep * speedFactor * direction;
+        // Use functional setState to ensure accumulation works with rapid scrolling
+        setScrubbingPosition(currentScrubbingPos => {
+          const currentPos = currentScrubbingPos ?? position;
+          return Math.max(0, Math.min(duration || 0, currentPos + seekStep));
+        });
         
-        // Accumulate scroll for smoother seeking
-        scrollAccumulatorRef.current += step;
-        
-        // Apply accumulated scroll
-        const currentPos = scrubbingPosition ?? position;
-        const newPosition = Math.max(0, Math.min(duration || 0, currentPos + scrollAccumulatorRef.current));
-        
-        if (newPosition !== scrubbingPosition) {
-          setScrubbingPosition(newPosition);
-          scrollAccumulatorRef.current = 0; // Reset accumulator after applying
-          
-          // Reset timeout for auto-exit
+        // Reset timeout for auto-exit
+        if (scrubbingTimeoutRef.current) {
+          clearTimeout(scrubbingTimeoutRef.current);
+        }
+        scrubbingTimeoutRef.current = setTimeout(() => {
+          setScrubbingPosition(currentPos => {
+            if (currentPos !== null) {
+              seekTo(currentPos);
+              lastSeekTimeRef.current = Date.now(); // Mark seek time
+            }
+            return null;
+          });
+          setScrubbingMode(false);
+          scrubbingStartPositionRef.current = null;
           if (scrubbingTimeoutRef.current) {
             clearTimeout(scrubbingTimeoutRef.current);
+            scrubbingTimeoutRef.current = null;
           }
-          scrubbingTimeoutRef.current = setTimeout(() => {
-            // Use refs to get current state values
-            setScrubbingPosition(currentPos => {
-              if (currentPos !== null) {
-                seekTo(currentPos);
-              }
-              return null;
-            });
-            setScrubbingMode(false);
-          }, 2000);
-        }
+        }, 2000);
       } else {
         // Volume mode - existing volume control logic
         const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
@@ -635,20 +648,10 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     prevVolumeRef.current = volume;
   }, [volume, showVolumeOverlay, manualVolumeChangeRef]);
 
-  // Volume icon based on current volume level
-  const VolumeIcon = useMemo(() => {
-    if (volume === 0) {
-      return <VolumeOffIcon className="w-7 h-7" />;
-    } else if (volume > 0 && volume <= 60) {
-      return <VolumeLowIcon className="w-7 h-7 ml-1.5" />;
-    } else {
-      return <VolumeLoudIcon className="w-7 h-7" />;
-    }
-  }, [volume]);
 
-  // Play/Pause icon based on current state
+  // Play/Pause icon based on debounced state to prevent flicker after seeking
   const PlayPauseIcon = () => {
-    return isPlaying ? (
+    return debouncedIsPlaying ? (
       <PauseIcon className="w-14 h-14" />
     ) : (
       <PlayIcon className="w-14 h-14" />
@@ -667,6 +670,16 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
       {/* Scrubbing Mode Overlay */}
       {scrubbingMode && (
         <div className="absolute inset-0 z-50 bg-black/60 flex flex-col items-center justify-center pointer-events-none">
+          {/* Delta indicator */}
+          {scrubbingStartPositionRef.current !== null && scrubbingPosition !== null && (
+            <div className="text-white/70 text-2xl font-medium mb-4">
+              {(() => {
+                const delta = scrubbingPosition - scrubbingStartPositionRef.current;
+                const sign = delta >= 0 ? '+' : '';
+                return `${sign}${convertTimeToLength(Math.abs(delta))}`;
+              })()}
+            </div>
+          )}
           <div className="text-white text-6xl font-bold mb-8">
             {convertTimeToLength(scrubbingPosition || 0)}
           </div>
@@ -733,7 +746,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
                 <div>Track: {currentTrack || 'None'}</div>
               </div>
             )}
-            {isConnected ? (
+            {albumArtUrl && (currentTrack || currentAlbum || currentArtist) ? (
               <DoubleBufferedImage
                 src={albumArtUrl}
                 alt={`${currentAlbum || currentTrack} album art`}
@@ -900,7 +913,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
               <HeartIcon className="w-14 h-14" />
             </div>
           ) : (
-            VolumeIcon
+            <div className="w-14 h-14"></div>
           )}
         </div>
 
@@ -1019,10 +1032,6 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
               
               {mediaMode === 'podcast' && (
                 <>
-                  <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
-                    <span className="text-white">Volume</span>
-                    {VolumeIcon}
-                  </div>
                   <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
                     <span className="text-white">Playback Speed</span>
                     <span className="text-white text-sm">1.0x</span>

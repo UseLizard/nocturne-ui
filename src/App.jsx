@@ -14,6 +14,7 @@ import ButtonMappingOverlay from "./components/common/overlays/ButtonMappingOver
 import NetworkBanner from "./components/common/overlays/NetworkBanner";
 import PowerMenu from "./components/common/overlays/PowerMenu";
 import GradientBackground from "./components/common/GradientBackground";
+import LockScreen from "./components/lockscreen/LockScreen";
 import { useNetwork } from "./hooks/useNetwork";
 import { useGradientState } from "./hooks/useGradientState";
 import { DeviceSwitcherContext } from "./hooks/useSpotifyPlayerControls";
@@ -276,7 +277,10 @@ function App() {
   const [selectedNetwork, setSelectedNetwork] = useState(null);
   const [showConnectorModal, setShowConnectorModal] = useState(false);
   const [showPowerMenu, setShowPowerMenu] = useState(false);
+  const [showLockScreen, setShowLockScreen] = useState(false);
   const [playbackIntentOnDeviceSwitch, setPlaybackIntentOnDeviceSwitch] = useState(null);
+  const [mKeyPressStart, setMKeyPressStart] = useState(null);
+  const longPressTimeoutRef = useRef(null);
 
   useEffect(() => {
     fetch('http://localhost:5000/device/resetcounter', {
@@ -288,21 +292,63 @@ function App() {
 
   useEffect(() => {
     const handlePowerMenuKeyDown = (e) => {
-      if (showTutorial || (e.key.toLowerCase() === 'm' && !showPowerMenu)) {
+      if (showTutorial) return;
+      
+      if (e.key.toLowerCase() === 'm' && !e.repeat && !mKeyPressStart) {
         e.preventDefault();
         e.stopPropagation();
-        if (e.key.toLowerCase() === 'm' && !showPowerMenu && !showTutorial) {
+        
+        console.log('M key pressed - starting long press timer');
+        
+        // Start tracking long press
+        const pressStartTime = Date.now();
+        setMKeyPressStart(pressStartTime);
+        
+        // Set timeout for long press (800ms) - just a backup
+        longPressTimeoutRef.current = setTimeout(() => {
+          console.log('Long press timeout reached - backup timer');
+        }, 800);
+      }
+    };
+    
+    const handlePowerMenuKeyUp = (e) => {
+      if (e.key.toLowerCase() === 'm' && mKeyPressStart) {
+        const pressDuration = Date.now() - mKeyPressStart;
+        console.log('M key released - duration:', pressDuration);
+        
+        // Clear long press timeout
+        if (longPressTimeoutRef.current) {
+          clearTimeout(longPressTimeoutRef.current);
+          longPressTimeoutRef.current = null;
+        }
+        
+        // Check if it was a long press (>= 800ms) and trigger lockscreen
+        if (pressDuration >= 800) {
+          console.log('Long press detected - showing lockscreen');
+          setShowLockScreen(true);
+        }
+        // If it was a short press and not on lockscreen, show power menu
+        else if (!showLockScreen && !showPowerMenu && !showTutorial) {
+          console.log('Short press detected - showing power menu');
           setShowPowerMenu(true);
         }
+        
+        setMKeyPressStart(null);
       }
     };
 
     document.addEventListener('keydown', handlePowerMenuKeyDown, { capture: true });
+    document.addEventListener('keyup', handlePowerMenuKeyUp, { capture: true });
 
     return () => {
       document.removeEventListener('keydown', handlePowerMenuKeyDown, { capture: true });
+      document.removeEventListener('keyup', handlePowerMenuKeyUp, { capture: true });
+      if (longPressTimeoutRef.current) {
+        clearTimeout(longPressTimeoutRef.current);
+        longPressTimeoutRef.current = null;
+      }
     };
-  }, [showPowerMenu, showTutorial]);
+  }, [showPowerMenu, showTutorial, showLockScreen, mKeyPressStart]);
 
   const {
     isAuthenticated,
@@ -443,6 +489,13 @@ function App() {
       setShowTutorial(true);
     }
   }, [setActiveSection]);
+
+  // Handle lock screen activation
+  useEffect(() => {
+    if (activeSection === 'lockscreen') {
+      setShowLockScreen(true);
+    }
+  }, [activeSection]);
 
   useEffect(() => {
     if (showTutorial) {
@@ -692,7 +745,16 @@ function App() {
                   <GradientBackground gradientState={gradientState} className="bg-black" />
 
                   <div className="relative z-10">
-                    {content}
+                    {showLockScreen ? (
+                      <LockScreen 
+                        onUnlock={() => {
+                          setShowLockScreen(false);
+                          setActiveSection('media'); // Return to media after unlock
+                        }}
+                      />
+                    ) : (
+                      content
+                    )}
                     {!isFlashing && !showTetheringScreen && !showConnectionLostScreen && (
                       <>
                         {pairingRequest ? (

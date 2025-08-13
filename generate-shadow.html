@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Generate Album Shadow</title>
+</head>
+<body>
+    <canvas id="canvas" width="300" height="300"></canvas>
+    <br>
+    <button onclick="downloadWebP()">Download album-shadow.webp</button>
+    
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Clear canvas with transparent background
+        ctx.clearRect(0, 0, 300, 300);
+        
+        // Create shadow effect
+        // The album art is 280x280, centered in 300x300 canvas
+        // So we have 10px margin on each side
+        
+        // Enable shadows
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.25)'; // 25% opacity black
+        ctx.shadowBlur = 5; // 5px blur
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 8; // 8px downward offset
+        
+        // Draw a rounded rectangle that will only show its shadow
+        // We'll draw it off-canvas so only the shadow is visible
+        ctx.fillStyle = 'rgba(0, 0, 0, 1)';
+        
+        // Draw rounded rectangle for shadow
+        const x = 10;
+        const y = 10;
+        const width = 280;
+        const height = 280;
+        const radius = 12; // Match the rounded-[12px] from the album art
+        
+        ctx.beginPath();
+        ctx.moveTo(x + radius, y);
+        ctx.lineTo(x + width - radius, y);
+        ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+        ctx.lineTo(x + width, y + height - radius);
+        ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+        ctx.lineTo(x + radius, y + height);
+        ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+        ctx.lineTo(x, y + radius);
+        ctx.quadraticCurveTo(x, y, x + radius, y);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Now clear the actual shape, leaving only the shadow
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.shadowColor = 'transparent';
+        ctx.fill();
+        
+        // Reset composite operation
+        ctx.globalCompositeOperation = 'source-over';
+        
+        function downloadWebP() {
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'album-shadow.webp';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 'image/webp', 0.9);
+        }
+    </script>
+</body>
+</html>

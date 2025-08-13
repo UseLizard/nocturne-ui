@@ -54,7 +54,7 @@ export default function StatusBar() {
   // Listen for time sync updates from BLE connection
   useEffect(() => {
     const handleTimeUpdate = (data) => {
-      if (data.type === 'system/time_updated') {
+      if (data.type === 'system/time_updated' || data.type === 'timeSync') {
         console.log('Time sync received:', data.payload);
         setLastTimeSync(data.payload.timestamp_ms);
         
