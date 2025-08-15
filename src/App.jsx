@@ -15,6 +15,7 @@ import NetworkBanner from "./components/common/overlays/NetworkBanner";
 import PowerMenu from "./components/common/overlays/PowerMenu";
 import GradientBackground from "./components/common/GradientBackground";
 import LockScreen from "./components/lockscreen/LockScreen";
+import FpsMonitor from "./components/debug/FpsMonitor";
 import { useNetwork } from "./hooks/useNetwork";
 import { useGradientState } from "./hooks/useGradientState";
 import { DeviceSwitcherContext } from "./hooks/useSpotifyPlayerControls";
@@ -226,7 +227,7 @@ function useGlobalButtonMapping({
     if (!isAuthenticated || isTutorialActive) return;
 
     const handleKeyDown = (e) => {
-      const validButtons = ["1", "2", "3", "4"];
+      const validButtons = ["1", "2", "4"]; // Removed "3" since it's used for screenshots
       const buttonNumber = e.key;
 
       if (!validButtons.includes(buttonNumber)) return;
@@ -234,7 +235,7 @@ function useGlobalButtonMapping({
     };
 
     const handleKeyUp = (e) => {
-      const validButtons = ["1", "2", "3", "4"];
+      const validButtons = ["1", "2", "4"]; // Removed "3" since it's used for screenshots
       const buttonNumber = e.key;
 
       if (!validButtons.includes(buttonNumber)) return;
@@ -280,6 +281,7 @@ function App() {
   const [showLockScreen, setShowLockScreen] = useState(false);
   const [playbackIntentOnDeviceSwitch, setPlaybackIntentOnDeviceSwitch] = useState(null);
   const [mKeyPressStart, setMKeyPressStart] = useState(null);
+  const [showFpsMonitor, setShowFpsMonitor] = useState(false);
   const longPressTimeoutRef = useRef(null);
 
   useEffect(() => {
@@ -349,6 +351,64 @@ function App() {
       }
     };
   }, [showPowerMenu, showTutorial, showLockScreen, mKeyPressStart]);
+
+  // FPS monitor keyboard shortcut (2 key)
+  useEffect(() => {
+    const handleFpsToggle = (e) => {
+      if (e.key === '2' && !e.repeat) {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowFpsMonitor(prev => !prev);
+        console.log('FPS monitor toggled:', !showFpsMonitor);
+      }
+    };
+
+    document.addEventListener('keydown', handleFpsToggle, { capture: true });
+
+    return () => {
+      document.removeEventListener('keydown', handleFpsToggle, { capture: true });
+    };
+  }, [showFpsMonitor]);
+
+  // Screenshot functionality (3 key)
+  useEffect(() => {
+    const takeScreenshot = async () => {
+      try {
+        console.log('Taking server-side screenshot...');
+        
+        const response = await fetch('http://localhost:5000/api/screenshot', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log('Screenshot saved successfully:', result.filename, 'via', result.method);
+        } else {
+          const error = await response.json();
+          console.error('Failed to save screenshot:', error.Error || response.statusText);
+        }
+      } catch (error) {
+        console.error('Error taking screenshot:', error);
+      }
+    };
+
+    const handleScreenshot = (e) => {
+      if (e.key === '3' && !e.repeat) {
+        e.preventDefault();
+        e.stopPropagation();
+        takeScreenshot();
+      }
+    };
+
+    document.addEventListener('keydown', handleScreenshot, { capture: true });
+
+    return () => {
+      document.removeEventListener('keydown', handleScreenshot, { capture: true });
+    };
+  }, []);
 
   const {
     isAuthenticated,
@@ -746,14 +806,18 @@ function App() {
 
                   <div className="relative z-10">
                     {showLockScreen ? (
-                      <LockScreen 
-                        onUnlock={() => {
-                          setShowLockScreen(false);
-                          setActiveSection('media'); // Return to media after unlock
-                        }}
-                      />
+                      <div className="fadeIn-animation">
+                        <LockScreen 
+                          onUnlock={() => {
+                            setShowLockScreen(false);
+                            setActiveSection('media'); // Return to media after unlock
+                          }}
+                        />
+                      </div>
                     ) : (
-                      content
+                      <div className="fadeIn-animation">
+                        {content}
+                      </div>
                     )}
                     {!isFlashing && !showTetheringScreen && !showConnectionLostScreen && (
                       <>
@@ -801,6 +865,10 @@ function App() {
                     <PowerMenu
                       isVisible={showPowerMenu}
                       onClose={() => setShowPowerMenu(false)}
+                    />
+                    <FpsMonitor
+                      enabled={showFpsMonitor}
+                      position="top-right"
                     />
                   </div>
                 </main>

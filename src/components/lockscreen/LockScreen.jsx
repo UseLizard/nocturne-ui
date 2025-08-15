@@ -1,15 +1,15 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocalMedia } from '../../hooks/useLocalMedia';
-import { PlayIcon, PauseIcon } from '../common/icons';
+import { PlayIcon, PauseIcon, SkipForwardIcon, SkipBackwardIcon, LockIcon } from '../common/icons';
 import { SunIcon, MoonIcon } from '../common/icons';
 
 const LockScreen = ({ onUnlock }) => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isDayMode, setIsDayMode] = useState(true);
   const [isManualOverride, setIsManualOverride] = useState(false);
-  const [swipeStart, setSwipeStart] = useState(null);
-  const [swipeOffset, setSwipeOffset] = useState(0);
   const [isUnlocking, setIsUnlocking] = useState(false);
+  const [trackSwipeStart, setTrackSwipeStart] = useState(null);
+  const [currentGradient, setCurrentGradient] = useState('');
   const [showVolumeIndicator, setShowVolumeIndicator] = useState(false);
   const containerRef = useRef(null);
   const volumeTimeoutRef = useRef(null);
@@ -30,6 +30,10 @@ const LockScreen = ({ onUnlock }) => {
     togglePlayPause,
     volume,
     setVolume,
+    next,
+    previous,
+    position: positionMs,
+    duration: durationMs,
   } = useLocalMedia();
 
   // Update time every second and set theme based on time (unless manually overridden)
@@ -51,6 +55,58 @@ const LockScreen = ({ onUnlock }) => {
 
     return () => clearInterval(timer);
   }, [isManualOverride]);
+
+  // Initialize gradient on mount
+  useEffect(() => {
+    const hour = currentTime.getHours();
+    let initialGradient;
+    
+    if (isDayMode) {
+      if (hour >= 6 && hour < 12) {
+        initialGradient = 'linear-gradient(135deg, #fefefe 0%, #f0f8ff 30%, #e6f3ff 70%, #d1e9ff 100%)';
+      } else if (hour >= 12 && hour < 18) {
+        initialGradient = 'linear-gradient(135deg, #fefefe 0%, #faf7f0 30%, #f5f0e8 70%, #ede4d3 100%)';
+      } else {
+        initialGradient = 'linear-gradient(135deg, #fefefe 0%, #f0f4f8 30%, #dbe7f0 70%, #c7d2e7 100%)';
+      }
+    } else {
+      if (hour >= 22 || hour < 4) {
+        initialGradient = 'linear-gradient(135deg, #050505 0%, #0f0f23 30%, #1a1a3a 70%, #2d2d55 100%)';
+      } else if (hour >= 4 && hour < 6) {
+        initialGradient = 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 30%, #2d1b69 70%, #4c1d95 100%)';
+      } else {
+        initialGradient = 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 30%, #16213e 70%, #0f4c75 100%)';
+      }
+    }
+    
+    setCurrentGradient(initialGradient);
+  }, []);
+
+  // Update gradient when day/night mode changes
+  useEffect(() => {
+    const hour = currentTime.getHours();
+    let newGradient;
+    
+    if (isDayMode) {
+      if (hour >= 6 && hour < 12) {
+        newGradient = 'linear-gradient(135deg, #fefefe 0%, #f0f8ff 30%, #e6f3ff 70%, #d1e9ff 100%)';
+      } else if (hour >= 12 && hour < 18) {
+        newGradient = 'linear-gradient(135deg, #fefefe 0%, #faf7f0 30%, #f5f0e8 70%, #ede4d3 100%)';
+      } else {
+        newGradient = 'linear-gradient(135deg, #fefefe 0%, #f0f4f8 30%, #dbe7f0 70%, #c7d2e7 100%)';
+      }
+    } else {
+      if (hour >= 22 || hour < 4) {
+        newGradient = 'linear-gradient(135deg, #050505 0%, #0f0f23 30%, #1a1a3a 70%, #2d2d55 100%)';
+      } else if (hour >= 4 && hour < 6) {
+        newGradient = 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 30%, #2d1b69 70%, #4c1d95 100%)';
+      } else {
+        newGradient = 'linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 30%, #16213e 70%, #0f4c75 100%)';
+      }
+    }
+    
+    setCurrentGradient(newGradient);
+  }, [isDayMode, currentTime]);
   
   // Reset manual override after 30 minutes to resume automatic theme detection
   useEffect(() => {
@@ -156,43 +212,37 @@ const LockScreen = ({ onUnlock }) => {
     };
   };
 
-  // Handle swipe gestures and tap detection
-  const handleTouchStart = useCallback((e) => {
+  // Handle track swipe gestures
+  const handleTrackSwipeStart = useCallback((e) => {
+    if (!currentTrack) return;
     const touch = e.touches[0];
-    setSwipeStart(touch.clientY);
-    setSwipeOffset(0);
+    setTrackSwipeStart(touch.clientX);
     
-    // Track tap timing and position
+    // Track tap timing and position for play/pause
     tapStartTimeRef.current = Date.now();
     tapStartPosRef.current = { x: touch.clientX, y: touch.clientY };
-  }, []);
+  }, [currentTrack]);
 
-  const handleTouchMove = useCallback((e) => {
-    if (!swipeStart) return;
+  const handleTrackSwipeEnd = useCallback(async (e) => {
+    if (!trackSwipeStart || !currentTrack) return;
     
-    const touch = e.touches[0];
-    const offset = swipeStart - touch.clientY;
+    const touch = e.changedTouches[0];
+    const swipeDistance = touch.clientX - trackSwipeStart;
+    const swipeThreshold = 80;
     
-    // Only allow upward swipes
-    if (offset > 0) {
-      setSwipeOffset(Math.min(offset, 200));
-    }
-  }, [swipeStart]);
-
-  const handleTouchEnd = useCallback(async (e) => {
-    const shouldUnlock = swipeOffset > 100;
-    
-    if (shouldUnlock) {
-      // Trigger unlock animation
-      setIsUnlocking(true);
-      setTimeout(() => {
-        onUnlock();
-      }, 300);
+    if (Math.abs(swipeDistance) > swipeThreshold) {
+      // Swipe detected
+      if (swipeDistance > 0 && previous) {
+        // Swipe right = previous track
+        await previous();
+      } else if (swipeDistance < 0 && next) {
+        // Swipe left = next track
+        await next();
+      }
     } else {
-      // Check if this was a tap (not a swipe/drag)
-      if (tapStartTimeRef.current && tapStartPosRef.current && currentTrack) {
+      // Check if this was a tap (not a swipe)
+      if (tapStartTimeRef.current && tapStartPosRef.current) {
         const touchDuration = Date.now() - tapStartTimeRef.current;
-        const touch = e.changedTouches[0];
         const distance = Math.sqrt(
           Math.pow(touch.clientX - tapStartPosRef.current.x, 2) +
           Math.pow(touch.clientY - tapStartPosRef.current.y, 2)
@@ -207,51 +257,12 @@ const LockScreen = ({ onUnlock }) => {
           }
         }
       }
-      
-      // Reset swipe
-      setSwipeOffset(0);
     }
     
-    setSwipeStart(null);
+    setTrackSwipeStart(null);
     tapStartTimeRef.current = null;
     tapStartPosRef.current = null;
-  }, [swipeOffset, onUnlock, currentTrack, togglePlayPause]);
-
-  // Handle mouse events for desktop testing
-  const handleMouseDown = useCallback((e) => {
-    setSwipeStart(e.clientY);
-    setSwipeOffset(0);
-  }, []);
-
-  const handleMouseMove = useCallback((e) => {
-    if (!swipeStart) return;
-    
-    const offset = swipeStart - e.clientY;
-    
-    // Only allow upward swipes
-    if (offset > 0) {
-      setSwipeOffset(Math.min(offset, 200));
-    }
-  }, [swipeStart]);
-
-  const handleMouseUp = useCallback(() => {
-    if (swipeOffset > 100) {
-      // Trigger unlock animation
-      setIsUnlocking(true);
-      setTimeout(() => {
-        onUnlock();
-      }, 300);
-    } else {
-      // Reset swipe
-      setSwipeOffset(0);
-    }
-    setSwipeStart(null);
-  }, [swipeOffset, onUnlock]);
-
-  const handleMouseLeave = useCallback(() => {
-    setSwipeOffset(0);
-    setSwipeStart(null);
-  }, []);
+  }, [trackSwipeStart, currentTrack, next, previous, togglePlayPause]);
 
   const toggleDayNight = () => {
     // Allow manual override of automatic theme
@@ -264,35 +275,41 @@ const LockScreen = ({ onUnlock }) => {
     await togglePlayPause();
   };
 
-  // Calculate opacity based on swipe progress
-  const opacity = Math.max(0, 1 - (swipeOffset / 200));
+  const handleUnlock = () => {
+    setIsUnlocking(true);
+    setTimeout(() => {
+      onUnlock();
+    }, 300);
+  };
+
+  // Format time duration for playback
+  const formatDuration = (ms) => {
+    if (!ms || ms <= 0) return '0:00';
+    const minutes = Math.floor(ms / 60000);
+    const seconds = Math.floor((ms % 60000) / 1000);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  };
+
   const dateInfo = formatDate(currentTime);
   const timeInfo = formatTime(currentTime);
+
 
   return (
     <div
       ref={containerRef}
       className={`fixed inset-0 z-50 transition-all duration-700 ${
         isUnlocking ? 'translate-y-[-100%]' : ''
-      } ${
-        isDayMode ? 'bg-white' : 'bg-black'
       }`}
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      onMouseDown={handleMouseDown}
-      onMouseMove={handleMouseMove}
-      onMouseUp={handleMouseUp}
-      onMouseLeave={handleMouseLeave}
       style={{
-        transform: `translateY(-${swipeOffset}px)`,
-        cursor: swipeStart ? 'grabbing' : 'grab'
+        background: currentGradient,
+        transition: 'background 1200ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
       }}
     >
       {/* Main Content */}
       <div 
-        className="flex flex-col items-center justify-center h-full"
-        style={{ opacity }}
+        className="flex flex-col items-center justify-center h-full pt-16"
+        onTouchStart={handleTrackSwipeStart}
+        onTouchEnd={handleTrackSwipeEnd}
       >
         {/* Time Display - Ultra minimal with AM/PM */}
         <div className="flex items-baseline justify-center">
@@ -327,7 +344,7 @@ const LockScreen = ({ onUnlock }) => {
               isDayMode ? 'bg-black/10' : 'bg-white/10'
             }`} 
             style={{ 
-              opacity: showVolumeIndicator ? 1 : 0.2 
+              opacity: showVolumeIndicator ? 1 : 0.3
             }}>
               <div
                 className={`h-full rounded-full transition-all duration-200 ${
@@ -344,32 +361,50 @@ const LockScreen = ({ onUnlock }) => {
 
         {/* Media Section - Only if playing */}
         {currentTrack && (
-          <div className="mt-20 flex flex-col items-center">
-            {/* Track Info - Minimal */}
-            <div className="text-center mb-8">
-              <div className={`text-lg font-normal mb-1 ${
-                isDayMode ? 'text-black/60' : 'text-white/60'
+          <div 
+            className="mt-16 flex flex-col items-center w-full max-w-md px-8 fadeIn-animation"
+          >
+            {/* Track Info - Bigger */}
+            <div className="text-center mb-6">
+              <div className={`text-2xl font-normal mb-2 ${
+                isDayMode ? 'text-black/70' : 'text-white/70'
               }`}>
                 {currentTrack}
               </div>
-              <div className={`text-base font-normal ${
-                isDayMode ? 'text-black/30' : 'text-white/30'
+              <div className={`text-lg font-normal ${
+                isDayMode ? 'text-black/50' : 'text-white/50'
               }`}>
                 {currentArtist || '—'}
               </div>
             </div>
 
-            {/* Play/Pause - Simple text button */}
+            {/* Playback Time */}
+            {durationMs && (
+              <div className={`text-lg font-normal mb-6 ${
+                isDayMode ? 'text-black/40' : 'text-white/40'
+              }`}>
+                {formatDuration(positionMs || 0)} / {formatDuration(durationMs)}
+              </div>
+            )}
+
+            {/* Play/Pause - Same size as track title */}
             <button
               onClick={handlePlayPause}
-              className={`transition-all hover:scale-105 bg-transparent focus:outline-none ${
-                isDayMode ? 'text-black/40' : 'text-white/40'
+              className={`transition-gentle hover:scale-105 bg-transparent focus:outline-none mb-4 ${
+                isDayMode ? 'text-black/70' : 'text-white/70'
               }`}
             >
-              <span className="text-lg font-normal">
+              <span className="text-2xl font-normal transition-gentle">
                 {isPlaying ? 'pause' : 'play'}
               </span>
             </button>
+
+            {/* Swipe hint */}
+            <div className={`text-xs font-normal mt-4 ${
+              isDayMode ? 'text-black/30' : 'text-white/30'
+            }`}>
+              swipe to skip tracks
+            </div>
           </div>
         )}
       </div>
@@ -378,44 +413,32 @@ const LockScreen = ({ onUnlock }) => {
       {/* Day/Night Toggle - Bottom Right */}
       <button
         onClick={toggleDayNight}
-        className={`absolute bottom-8 right-8 w-12 h-12 rounded-full transition-all flex items-center justify-center focus:outline-none ${
+        className={`absolute bottom-8 right-8 w-24 h-24 rounded-full transition-gentle flex items-center justify-center focus:outline-none ${
           isDayMode 
             ? 'bg-black/5 hover:bg-black/10' 
             : 'bg-white/5 hover:bg-white/10'
         }`}
       >
         {isDayMode ? (
-          <MoonIcon className="w-5 h-5 text-black/50" />
+          <MoonIcon className="w-10 h-10 text-black/50 transition-gentle" />
         ) : (
-          <SunIcon className="w-5 h-5 text-white/50" />
+          <SunIcon className="w-10 h-10 text-white/50 transition-gentle" />
         )}
       </button>
 
-      {/* Swipe Indicator - Ultra minimal */}
-      <div 
-        className="absolute bottom-8 left-0 right-0 flex justify-center"
-        style={{ opacity: Math.max(0, 0.5 - (swipeOffset / 200)) }}
+      {/* Unlock Button - Bottom left */}
+      <button
+        onClick={handleUnlock}
+        className={`absolute bottom-8 left-8 w-24 h-24 rounded-full transition-gentle flex items-center justify-center focus:outline-none ${
+          isDayMode 
+            ? 'bg-black/5 hover:bg-black/10' 
+            : 'bg-white/5 hover:bg-white/10'
+        }`}
       >
-        <div className={`w-32 h-1 rounded-full ${
-          isDayMode ? 'bg-black/10' : 'bg-white/10'
+        <LockIcon className={`w-10 h-10 transition-gentle ${
+          isDayMode ? 'text-black/50' : 'text-white/50'
         }`} />
-      </div>
-
-      {/* Unlock Progress - Only when actively swiping */}
-      {swipeOffset > 50 && (
-        <div 
-          className="absolute top-1/3 left-0 right-0 flex justify-center"
-          style={{ 
-            opacity: Math.min(1, (swipeOffset - 50) / 50),
-          }}
-        >
-          <div className={`text-sm font-normal ${
-            isDayMode ? 'text-black/40' : 'text-white/40'
-          }`}>
-            {swipeOffset > 100 ? 'Release' : ''}
-          </div>
-        </div>
-      )}
+      </button>
     </div>
   );
 };

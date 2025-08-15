@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../../hooks/useNavigation';
+import { useGradientState } from '../../hooks/useGradientState';
 import { ChevronLeftIcon } from '../common/icons';
 
 const AlbumArtGallery = ({ setActiveSection }) => {
+  const [gradientState, updateGradientColors] = useGradientState();
   const [albumArtList, setAlbumArtList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -16,8 +18,9 @@ const AlbumArtGallery = ({ setActiveSection }) => {
   });
 
   useEffect(() => {
+    updateGradientColors(null, "albumart");
     fetchAlbumArtList();
-  }, []);
+  }, [updateGradientColors]);
 
   const fetchAlbumArtList = async () => {
     try {

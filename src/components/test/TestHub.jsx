@@ -1,10 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useGradientState } from '../../hooks/useGradientState';
 import AlbumArtTest from "../AlbumArtTest";
 import BTSpeedTest from "./BTSpeedTest";
 import { ChevronLeftIcon } from "../common/icons";
 
 export default function TestHub() {
+  const [gradientState, updateGradientColors] = useGradientState();
   const [selectedTest, setSelectedTest] = useState(null);
+
+  useEffect(() => {
+    updateGradientColors(null, "test");
+  }, [updateGradientColors]);
 
   const testOptions = [
     {

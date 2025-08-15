@@ -7,6 +7,7 @@ import BluetoothMainBLE from "../components/bluetooth/BluetoothMainBLE";
 import AlbumArtGallery from "../components/albumart/AlbumArtGallery";
 import TestHub from "../components/test/TestHub";
 import TimeSync from "../components/timesync/TimeSync";
+import WeatherView from "../components/weather/WeatherView";
 import { useGradientState } from "../hooks/useGradientState";
 import { useNavigation } from "../hooks/useNavigation";
 import { useSpotifyPlayerControls } from "../hooks/useSpotifyPlayerControls";
@@ -79,6 +80,8 @@ export default function Home({
       updateGradientColors(null, "albumart");
     } else if (activeSection === "timesync") {
       updateGradientColors(null, "timesync");
+    } else if (activeSection === "weather") {
+      updateGradientColors(null, "weather");
     }
   }, [
     activeSection,
@@ -790,6 +793,8 @@ export default function Home({
         return <AlbumArtGallery setActiveSection={setActiveSection} />;
       case "timesync":
         return <TimeSync setActiveSection={setActiveSection} />;
+      case "weather":
+        return <WeatherView setActiveSection={setActiveSection} />;
       case "test":
         return <TestHub />;
       default:
@@ -801,11 +806,13 @@ export default function Home({
     }
   };
 
-  // Render media, bluetooth, albumart, timesync, and test sections as full-screen like NowPlaying
-  if (activeSection === "media" || activeSection === "bluetooth" || activeSection === "albumart" || activeSection === "timesync" || activeSection === "test") {
+  // Render media, bluetooth, albumart, timesync, weather, and test sections as full-screen like NowPlaying
+  if (activeSection === "media" || activeSection === "bluetooth" || activeSection === "albumart" || activeSection === "timesync" || activeSection === "weather" || activeSection === "test") {
     return (
       <div className="relative min-h-screen">
-        {renderContent()}
+        <div className="slideIn-animation">
+          {renderContent()}
+        </div>
         {showDonationModal && (
           <DonationQRModal onClose={() => setShowDonationModal(false)} />
         )}
@@ -826,7 +833,11 @@ export default function Home({
           />
         </div>
 
-        <div className="h-screen overflow-y-auto">{renderContent()}</div>
+        <div className="h-screen overflow-y-auto">
+          <div className="transition-smooth">
+            {renderContent()}
+          </div>
+        </div>
       </div>
 
       {showDonationModal && (

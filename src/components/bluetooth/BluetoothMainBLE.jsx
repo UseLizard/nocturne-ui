@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useBluetooth, useNocturned } from '../../hooks/useNocturned';
+import { useGradientState } from '../../hooks/useGradientState';
 import DeviceList from './DeviceList';
 import BluetoothStatus from './BluetoothStatus';
 import BLEConnectionLog from './BLEConnectionLog';
 import { BluetoothIcon, RefreshIcon, SmartphoneIcon } from '../common/icons';
 
 const BluetoothMainBLE = ({ setActiveSection }) => {
+  const [gradientState, updateGradientColors] = useGradientState();
+  
   const {
     devices,
     loading,
@@ -30,10 +33,11 @@ const BluetoothMainBLE = ({ setActiveSection }) => {
     deviceAddress: null,
   });
 
-  // Fetch devices on mount
+  // Initialize gradient and fetch devices on mount
   useEffect(() => {
+    updateGradientColors(null, "bluetooth");
     fetchDevices();
-  }, [fetchDevices]);
+  }, [updateGradientColors, fetchDevices]);
 
   // Handle back navigation with escape key
   useEffect(() => {
