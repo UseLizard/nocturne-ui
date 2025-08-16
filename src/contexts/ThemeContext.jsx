@@ -43,10 +43,11 @@ export const ThemeProvider = ({ children }) => {
     console.log('🖼️ THEME: Updating gradient background');
     lastBackgroundRef.current = backgroundCSS;
     
-    handleSetTheme({
+    setTheme(prevTheme => ({
+      ...prevTheme,
       background: backgroundCSS,
-      transition: DEFAULT_THEME.transition
-    });
+      transition: prevTheme.transition || DEFAULT_THEME.transition
+    }));
   }, [handleSetTheme]);
 
   const resetToDefault = useCallback(() => {
@@ -66,7 +67,8 @@ export const ThemeProvider = ({ children }) => {
       <div 
         className="fixed inset-0 z-0 rounded-2xl" 
         style={{ 
-          backgroundColor: theme.background || '#1a1a2e',
+          background: theme.background || '#1a1a2e',
+          transition: theme.transition || 'background 1200ms cubic-bezier(0.25, 0.46, 0.45, 0.94)',
           minHeight: '100vh',
           minWidth: '100vw'
         }} 

@@ -27,6 +27,7 @@ import { PlayerProvider } from "./contexts/PlayerContext";
 import React from "react";
 import PairingScreen from "./components/auth/PairingScreen";
 import { createSpotifyUri, getSpotifyUriTypes } from "./utils/spotifyUtils";
+import ColorTransitionTester from "./components/test/ColorTransitionTester";
 
 export const NetworkContext = React.createContext({
   selectedNetwork: null,
@@ -293,6 +294,7 @@ function App() {
   const [mKeyPressStart, setMKeyPressStart] = useState(null);
   const [showFpsMonitor, setShowFpsMonitor] = useState(false);
   const [showConsoleOverlay, setShowConsoleOverlay] = useState(false);
+  const [showColorTransitionTester, setShowColorTransitionTester] = useState(false);
   const longPressTimeoutRef = useRef(null);
 
 
@@ -399,107 +401,24 @@ function App() {
     };
   }, [showConsoleOverlay]);
 
-  // Screenshot functionality (3 key)
+
+  // Color Transition Tester keyboard shortcut (3 key)
   useEffect(() => {
-    const takeScreenshot = async () => {
-      try {
-        console.log('Taking server-side screenshot...');
-        
-        const response = await fetch('http://localhost:5000/api/screenshot', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-        
-        if (response.ok) {
-          const result = await response.json();
-          console.log('Screenshot saved successfully:', result.filename, 'via', result.method);
-        } else {
-          const error = await response.json();
-          console.error('Failed to save screenshot:', error.Error || response.statusText);
-          
-          // Fallback to client-side screenshot
-          console.log('Trying client-side screenshot...');
-          await takeClientScreenshot();
-        }
-      } catch (error) {
-        console.error('Error taking screenshot:', error);
-        // Fallback to client-side screenshot
-        console.log('Trying client-side screenshot...');
-        await takeClientScreenshot();
-      }
-    };
-
-    const takeClientScreenshot = async () => {
-      try {
-        // Method 1: Try Chrome extension API
-        if (window.chrome && chrome.tabs) {
-          chrome.tabs.captureVisibleTab(null, {format: 'png'}, (dataUrl) => {
-            const link = document.createElement('a');
-            link.download = 'nocturne-screenshot.png';
-            link.href = dataUrl;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            console.log('Screenshot saved via Chrome extension API');
-          });
-          return;
-        }
-
-        // Method 2: Try html2canvas (if available)
-        if (window.html2canvas) {
-          const canvas = await window.html2canvas(document.body);
-          const link = document.createElement('a');
-          link.download = 'nocturne-screenshot.png';
-          link.href = canvas.toDataURL();
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          console.log('Screenshot saved via html2canvas');
-          return;
-        }
-
-        // Method 3: Simple canvas screenshot
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        
-        // This will capture a basic representation
-        ctx.fillStyle = '#000000';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '20px Arial';
-        ctx.fillText('Screenshot taken at ' + new Date().toLocaleTimeString(), 50, 50);
-        
-        const link = document.createElement('a');
-        link.download = 'nocturne-screenshot.png';
-        link.href = canvas.toDataURL();
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        console.log('Screenshot saved via basic canvas');
-        
-      } catch (error) {
-        console.error('Client-side screenshot failed:', error);
-      }
-    };
-
-    const handleScreenshot = (e) => {
+    const handleColorTransitionTesterToggle = (e) => {
       if (e.key === '3' && !e.repeat) {
         e.preventDefault();
         e.stopPropagation();
-        takeScreenshot();
+        setShowColorTransitionTester(prev => !prev);
+        console.log('Color Transition Tester toggled:', !showColorTransitionTester);
       }
     };
 
-    document.addEventListener('keydown', handleScreenshot, { capture: true });
+    document.addEventListener('keydown', handleColorTransitionTesterToggle, { capture: true });
 
     return () => {
-      document.removeEventListener('keydown', handleScreenshot, { capture: true });
+      document.removeEventListener('keydown', handleColorTransitionTesterToggle, { capture: true });
     };
-  }, []);
+  }, [showColorTransitionTester]);
 
   const {
     isAuthenticated,
@@ -859,6 +778,7 @@ function App() {
                           isVisible={showConsoleOverlay}
                           onToggle={() => setShowConsoleOverlay(prev => !prev)}
                         />
+                        {showColorTransitionTester && <ColorTransitionTester />}
                       </div>
                     </main>
                   </Router>
