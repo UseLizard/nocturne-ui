@@ -3,7 +3,6 @@ import { useGradientState } from "../../hooks/useGradientState";
 import { useAuth } from "../../hooks/useAuth";
 import { useNetwork } from "../../hooks/useNetwork";
 import NocturneIcon from "../common/icons/NocturneIcon";
-import GradientBackground from "../common/GradientBackground";
 import QRCodeDisplay from "./QRCodeDisplay";
 import NetworkScreen from "./NetworkScreen";
 
@@ -105,7 +104,6 @@ const AuthScreen = ({ onAuthSuccess }) => {
   if (!initialCheckDone) {
     return (
       <div className="h-screen flex items-center justify-center overflow-hidden fixed inset-0 rounded-2xl">
-        <GradientBackground gradientState={gradientState} />
         <div className="relative z-10 flex flex-col items-center justify-center">
           <NocturneIcon className="h-12 w-auto animate-pulse" />
         </div>

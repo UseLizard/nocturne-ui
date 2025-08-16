@@ -5,6 +5,7 @@ import DeviceList from './DeviceList';
 import BluetoothStatus from './BluetoothStatus';
 import BLEConnectionLog from './BLEConnectionLog';
 import { BluetoothIcon, RefreshIcon, SmartphoneIcon } from '../common/icons';
+import ErrorMessage from '../common/ErrorMessage';
 
 const BluetoothMainBLE = ({ setActiveSection }) => {
   const [gradientState, updateGradientColors] = useGradientState();
@@ -217,8 +218,12 @@ const BluetoothMainBLE = ({ setActiveSection }) => {
 
           {/* Error Display */}
           {error && (
-            <div className="p-6 bg-red-500/20 rounded-xl mb-8 border border-red-500/30">
-              <div className="text-red-300 text-[32px] font-[560] tracking-tight">{error}</div>
+            <div className="mb-8">
+              <ErrorMessage 
+                message={error}
+                onRetry={handleRefresh}
+                className="bg-red-500/20 rounded-xl p-6 border border-red-500/30"
+              />
             </div>
           )}
 

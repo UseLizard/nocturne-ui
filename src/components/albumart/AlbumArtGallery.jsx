@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigation } from '../../hooks/useNavigation';
 import { useGradientState } from '../../hooks/useGradientState';
 import { ChevronLeftIcon } from '../common/icons';
+import ErrorMessage from '../common/ErrorMessage';
 
 const AlbumArtGallery = ({ setActiveSection }) => {
   const [gradientState, updateGradientColors] = useGradientState();
@@ -77,15 +78,11 @@ const AlbumArtGallery = ({ setActiveSection }) => {
             ))}
           </div>
         ) : error ? (
-          <div className="flex flex-col items-center justify-center h-64">
-            <div className="text-red-400 text-xl mb-4">Error loading album art</div>
-            <div className="text-white/60 text-sm mb-4">{error}</div>
-            <button
-              onClick={fetchAlbumArtList}
-              className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors"
-            >
-              Retry
-            </button>
+          <div className="flex items-center justify-center h-64">
+            <ErrorMessage 
+              message={`Error loading album art: ${error}`}
+              onRetry={fetchAlbumArtList}
+            />
           </div>
         ) : albumArtList.length === 0 ? (
           <div className="flex items-center justify-center h-64">

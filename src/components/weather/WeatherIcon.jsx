@@ -16,11 +16,11 @@ const WeatherIcon = ({ weatherCode, className = "", isDaytime = true }) => {
       case 51: 
       case 53: 
       case 55: // Drizzle
-        return '/icons/weather/drizzle.svg';
+        return '/icons/weather/rainy.svg';
       case 61: 
       case 63: 
       case 65: // Rain
-        return '/icons/weather/rain.svg';
+        return '/icons/weather/rainy.svg';
       case 71: 
       case 73: 
       case 75: 
@@ -29,7 +29,7 @@ const WeatherIcon = ({ weatherCode, className = "", isDaytime = true }) => {
       case 80: 
       case 81: 
       case 82: // Showers
-        return '/icons/weather/showers.svg';
+        return '/icons/weather/rainy.svg';
       case 85: 
       case 86: // Snow showers
         return '/icons/weather/snow-showers.svg';
@@ -49,7 +49,6 @@ const WeatherIcon = ({ weatherCode, className = "", isDaytime = true }) => {
       src={iconPath}
       alt={`Weather condition ${weatherCode}`}
       className={className}
-      style={{ filter: 'drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1))' }}
     />
   );
 };

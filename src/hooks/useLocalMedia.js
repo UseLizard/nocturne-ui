@@ -183,11 +183,11 @@ export const useLocalMedia = () => {
       // Always use the current album art endpoint with cache busting
       setAlbumArtUrl(`http://localhost:5000/api/albumart?t=${Date.now()}`);
     } else if (data.type === 'media/album_art_cached') {
-      // Album art is already cached, but still use the current endpoint
+      // Album art is already cached - always set URL for track changes
       const { artist, album } = data.payload;
-      console.log('Album art cached:', artist, album);
+      console.log('Album art already cached for:', artist, album);
       
-      // Use the current album art endpoint with cache busting
+      // Always set URL to ensure album art shows up, especially after track changes
       setAlbumArtUrl(`http://localhost:5000/api/albumart?t=${Date.now()}`);
     }
   }, []);
@@ -226,11 +226,17 @@ export const useLocalMedia = () => {
 
   useEffect(() => {
     if (isPlaying) {
+      let lastUpdateTime = 0;
       const animate = () => {
-        if (!isSeekingRef.current) {
-          const elapsed = Date.now() - lastClientUpdateRef.current;
-          const newPosition = (lastServerStateRef.current?.position_ms || 0) + elapsed;
-          setClientPosition(Math.min(newPosition, duration));
+        const now = Date.now();
+        // Only update position every 500ms to prevent excessive re-renders
+        if (now - lastUpdateTime >= 500) {
+          if (!isSeekingRef.current) {
+            const elapsed = now - lastClientUpdateRef.current;
+            const newPosition = (lastServerStateRef.current?.position_ms || 0) + elapsed;
+            setClientPosition(Math.min(newPosition, duration));
+          }
+          lastUpdateTime = now;
         }
         animationFrameRef.current = requestAnimationFrame(animate);
       };

@@ -6,9 +6,7 @@ import {
   RadioIcon,
   PodcastIcon,
   SettingsIcon,
-  BluetoothIcon,
   LockIcon,
-  ClockIcon,
   SunIcon,
 } from "../../common/icons";
 import StatusBar from "./StatusBar";
@@ -61,15 +59,11 @@ export default function Sidebar({ activeSection, setActiveSection }) {
       <SidebarItem section="recents" icon={RecentsIcon} label="Recents" />
       <SidebarItem section="library" icon={LibraryIcon} label="Library" />
       <SidebarItem section="artists" icon={ArtistsIcon} label="Artists" />
-      <SidebarItem section="albumart" icon={LibraryIcon} label="Album Art" />
       <SidebarItem section="radio" icon={RadioIcon} label="Radio" />
       <SidebarItem section="podcasts" icon={PodcastIcon} label="Podcasts" />
       <SidebarItem section="weather" icon={SunIcon} label="Weather" />
       <SidebarItem section="lockscreen" icon={LockIcon} label="Lock Screen" />
-      <SidebarItem section="timesync" icon={ClockIcon} label="Time Sync" />
       <SidebarItem section="settings" icon={SettingsIcon} label="Settings" />
-      <SidebarItem section="bluetooth" icon={BluetoothIcon} label="Bluetooth" />
-      <SidebarItem section="test" icon={SettingsIcon} label="Test" />
     </div>
   );
 }

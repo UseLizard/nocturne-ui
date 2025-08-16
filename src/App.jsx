@@ -3,7 +3,6 @@ import { BrowserRouter as Router } from "react-router-dom";
 import FontLoader from "./components/common/FontLoader";
 import AuthContainer from "./components/auth/AuthContainer";
 import NetworkScreen from "./components/auth/NetworkScreen";
-import Tutorial from "./components/tutorial/Tutorial";
 import Home from "./pages/Home";
 import ContentView from "./components/content/ContentView";
 import DeviceSwitcherModal from "./components/player/DeviceSwitcherModal";
@@ -13,19 +12,21 @@ import SystemUpdateModal from "./components/common/modals/SystemUpdateModal";
 import ButtonMappingOverlay from "./components/common/overlays/ButtonMappingOverlay";
 import NetworkBanner from "./components/common/overlays/NetworkBanner";
 import PowerMenu from "./components/common/overlays/PowerMenu";
-import GradientBackground from "./components/common/GradientBackground";
 import LockScreen from "./components/lockscreen/LockScreen";
 import FpsMonitor from "./components/debug/FpsMonitor";
+import ConsoleOverlay from "./components/debug/ConsoleOverlay";
 import { useNetwork } from "./hooks/useNetwork";
-import { useGradientState } from "./hooks/useGradientState";
 import { DeviceSwitcherContext } from "./hooks/useSpotifyPlayerControls";
 import { useBluetooth, useSystemUpdate } from "./hooks/useNocturned";
 import { useSpotifyData } from "./hooks/useSpotifyData";
 import { usePlaybackProgress } from "./hooks/usePlaybackProgress";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ConnectorProvider } from "./contexts/ConnectorContext";
+import { ThemeProvider } from "./contexts/ThemeContext";
+import { PlayerProvider } from "./contexts/PlayerContext";
 import React from "react";
 import PairingScreen from "./components/auth/PairingScreen";
+import { createSpotifyUri, getSpotifyUriTypes } from "./utils/spotifyUtils";
 
 export const NetworkContext = React.createContext({
   selectedNetwork: null,
@@ -43,7 +44,6 @@ function useGlobalButtonMapping({
   playTrack,
   refreshPlaybackState,
   setActiveSection,
-  isTutorialActive,
 }) {
   const [showMappingOverlay, setShowMappingOverlay] = useState(false);
   const [activeButton, setActiveButton] = useState(null);
@@ -55,8 +55,7 @@ function useGlobalButtonMapping({
       if (
         !accessToken ||
         !isAuthenticated ||
-        isProcessingButtonPress ||
-        isTutorialActive
+        isProcessingButtonPress
       )
         return;
 
@@ -72,11 +71,13 @@ function useGlobalButtonMapping({
       let contextUri = null;
       let uris = null;
 
+      const { ALBUM, PLAYLIST, ARTIST, SHOW, EPISODE } = getSpotifyUriTypes();
+      
       try {
         if (mappedType === "album") {
-          contextUri = `spotify:album:${mappedId}`;
+          contextUri = createSpotifyUri(ALBUM, mappedId);
         } else if (mappedType === "playlist") {
-          contextUri = `spotify:playlist:${mappedId}`;
+          contextUri = createSpotifyUri(PLAYLIST, mappedId);
         } else if (mappedType === "artist") {
           const response = await fetch(
             `https://api.spotify.com/v1/artists/${mappedId}/top-tracks?market=from_token`,
@@ -93,7 +94,7 @@ function useGlobalButtonMapping({
               uris = data.tracks.map((track) => track.uri);
             }
           } else {
-            contextUri = `spotify:artist:${mappedId}`;
+            contextUri = createSpotifyUri(ARTIST, mappedId);
           }
         } else if (mappedType === "show") {
           const response = await fetch(
@@ -118,11 +119,11 @@ function useGlobalButtonMapping({
                 }
               }
               
-              contextUri = `spotify:show:${mappedId}`;
-              uris = [`spotify:episode:${data.items[targetEpisodeIndex].id}`];
+              contextUri = createSpotifyUri(SHOW, mappedId);
+              uris = [createSpotifyUri(EPISODE, data.items[targetEpisodeIndex].id)];
             }
           } else {
-            contextUri = `spotify:show:${mappedId}`;
+            contextUri = createSpotifyUri(SHOW, mappedId);
           }
         } else if (mappedType === "mix") {
           const mixTracksJson = localStorage.getItem(
@@ -219,15 +220,14 @@ function useGlobalButtonMapping({
       refreshPlaybackState,
       setActiveSection,
       isProcessingButtonPress,
-      isTutorialActive,
     ]
   );
 
   useEffect(() => {
-    if (!isAuthenticated || isTutorialActive) return;
+    if (!isAuthenticated) return;
 
     const handleKeyDown = (e) => {
-      const validButtons = ["1", "2", "4"]; // Removed "3" since it's used for screenshots
+      const validButtons = ["1", "2", "4"]; // Restored "4" to valid buttons
       const buttonNumber = e.key;
 
       if (!validButtons.includes(buttonNumber)) return;
@@ -235,7 +235,7 @@ function useGlobalButtonMapping({
     };
 
     const handleKeyUp = (e) => {
-      const validButtons = ["1", "2", "4"]; // Removed "3" since it's used for screenshots
+      const validButtons = ["1", "2", "4"]; // Restored "4" to valid buttons
       const buttonNumber = e.key;
 
       if (!validButtons.includes(buttonNumber)) return;
@@ -256,7 +256,7 @@ function useGlobalButtonMapping({
       window.removeEventListener("keydown", handleKeyDown, { capture: true });
       window.removeEventListener("keyup", handleKeyUp, { capture: true });
     };
-  }, [isAuthenticated, handleButtonPress, isTutorialActive]);
+  }, [isAuthenticated, handleButtonPress]);
 
   const setIgnoreNextRelease = useCallback(() => {
     ignoreNextReleaseRef.current = true;
@@ -270,8 +270,18 @@ function useGlobalButtonMapping({
 }
 
 function App() {
-  const [showTutorial, setShowTutorial] = useState(false);
-  const [activeSection, setActiveSection] = useState("recents");
+  console.log('📱 APP: Component rendering');
+  const [activeSection, setActiveSection] = useState("media");
+  
+  // Add logging wrapper for setActiveSection
+  const setActiveSectionWithLogging = useCallback((newSection) => {
+    console.log('🧭 NAVIGATION:', {
+      to: newSection,
+      timestamp: new Date().toISOString(),
+      caller: new Error().stack.split('\n')[2] || 'unknown'
+    });
+    setActiveSection(newSection);
+  }, []);
   const [viewingContent, setViewingContent] = useState(null);
   const [contentSourceSection, setContentSourceSection] = useState(null);
   const [isDeviceSwitcherOpen, setIsDeviceSwitcherOpen] = useState(false);
@@ -282,7 +292,9 @@ function App() {
   const [playbackIntentOnDeviceSwitch, setPlaybackIntentOnDeviceSwitch] = useState(null);
   const [mKeyPressStart, setMKeyPressStart] = useState(null);
   const [showFpsMonitor, setShowFpsMonitor] = useState(false);
+  const [showConsoleOverlay, setShowConsoleOverlay] = useState(false);
   const longPressTimeoutRef = useRef(null);
+
 
   useEffect(() => {
     fetch('http://localhost:5000/device/resetcounter', {
@@ -294,7 +306,6 @@ function App() {
 
   useEffect(() => {
     const handlePowerMenuKeyDown = (e) => {
-      if (showTutorial) return;
       
       if (e.key.toLowerCase() === 'm' && !e.repeat && !mKeyPressStart) {
         e.preventDefault();
@@ -330,7 +341,7 @@ function App() {
           setShowLockScreen(true);
         }
         // If it was a short press and not on lockscreen, show power menu
-        else if (!showLockScreen && !showPowerMenu && !showTutorial) {
+        else if (!showLockScreen && !showPowerMenu) {
           console.log('Short press detected - showing power menu');
           setShowPowerMenu(true);
         }
@@ -350,7 +361,7 @@ function App() {
         longPressTimeoutRef.current = null;
       }
     };
-  }, [showPowerMenu, showTutorial, showLockScreen, mKeyPressStart]);
+  }, [showPowerMenu, showLockScreen, mKeyPressStart]);
 
   // FPS monitor keyboard shortcut (2 key)
   useEffect(() => {
@@ -369,6 +380,24 @@ function App() {
       document.removeEventListener('keydown', handleFpsToggle, { capture: true });
     };
   }, [showFpsMonitor]);
+
+  // Console overlay keyboard shortcut (4 key)
+  useEffect(() => {
+    const handleConsoleToggle = (e) => {
+      if (e.key === '4' && !e.repeat) {
+        e.preventDefault();
+        e.stopPropagation();
+        setShowConsoleOverlay(prev => !prev);
+        console.log('Console overlay toggled:', !showConsoleOverlay);
+      }
+    };
+
+    document.addEventListener('keydown', handleConsoleToggle, { capture: true });
+
+    return () => {
+      document.removeEventListener('keydown', handleConsoleToggle, { capture: true });
+    };
+  }, [showConsoleOverlay]);
 
   // Screenshot functionality (3 key)
   useEffect(() => {
@@ -389,9 +418,71 @@ function App() {
         } else {
           const error = await response.json();
           console.error('Failed to save screenshot:', error.Error || response.statusText);
+          
+          // Fallback to client-side screenshot
+          console.log('Trying client-side screenshot...');
+          await takeClientScreenshot();
         }
       } catch (error) {
         console.error('Error taking screenshot:', error);
+        // Fallback to client-side screenshot
+        console.log('Trying client-side screenshot...');
+        await takeClientScreenshot();
+      }
+    };
+
+    const takeClientScreenshot = async () => {
+      try {
+        // Method 1: Try Chrome extension API
+        if (window.chrome && chrome.tabs) {
+          chrome.tabs.captureVisibleTab(null, {format: 'png'}, (dataUrl) => {
+            const link = document.createElement('a');
+            link.download = 'nocturne-screenshot.png';
+            link.href = dataUrl;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            console.log('Screenshot saved via Chrome extension API');
+          });
+          return;
+        }
+
+        // Method 2: Try html2canvas (if available)
+        if (window.html2canvas) {
+          const canvas = await window.html2canvas(document.body);
+          const link = document.createElement('a');
+          link.download = 'nocturne-screenshot.png';
+          link.href = canvas.toDataURL();
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          console.log('Screenshot saved via html2canvas');
+          return;
+        }
+
+        // Method 3: Simple canvas screenshot
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        
+        // This will capture a basic representation
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '20px Arial';
+        ctx.fillText('Screenshot taken at ' + new Date().toLocaleTimeString(), 50, 50);
+        
+        const link = document.createElement('a');
+        link.download = 'nocturne-screenshot.png';
+        link.href = canvas.toDataURL();
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log('Screenshot saved via basic canvas');
+        
+      } catch (error) {
+        console.error('Client-side screenshot failed:', error);
       }
     };
 
@@ -457,8 +548,6 @@ function App() {
   const { updateStatus, progress, isUpdating, isError, errorMessage } =
     useSystemUpdate();
 
-  const [gradientState, updateGradientColors] = useGradientState(activeSection);
-
   const playbackProgress = usePlaybackProgress(currentPlayback, refreshPlaybackState, accessToken);
 
   const {
@@ -470,8 +559,7 @@ function App() {
     isAuthenticated,
     playTrack: playerControls.playTrack,
     refreshPlaybackState,
-    setActiveSection,
-    isTutorialActive: showTutorial,
+    setActiveSection: setActiveSectionWithLogging,
   });
 
   const handleOpenDeviceSwitcher = (playbackIntent = null) => {
@@ -498,7 +586,7 @@ function App() {
         if (success) {
           setTimeout(() => {
             refreshPlaybackState();
-            setActiveSection("media");
+            setActiveSectionWithLogging("media");
           }, 1500);
         }
         setPlaybackIntentOnDeviceSwitch(null);
@@ -538,17 +626,7 @@ function App() {
     }
   }, [isAuthenticated, refreshPlaybackState]);
 
-  useEffect(() => {
-    // Skip authentication check and go directly to media interface
-    const hasSeenTutorial = localStorage.getItem("hasSeenTutorial") === 'true';
-    if (hasSeenTutorial) {
-      setShowTutorial(false);
-      // Default to media section for Bluetooth-first experience
-      setActiveSection('media');
-    } else {
-      setShowTutorial(true);
-    }
-  }, [setActiveSection]);
+  // Removed: useEffect that was forcing section to media on every render
 
   // Handle lock screen activation
   useEffect(() => {
@@ -556,41 +634,6 @@ function App() {
       setShowLockScreen(true);
     }
   }, [activeSection]);
-
-  useEffect(() => {
-    if (showTutorial) {
-      updateGradientColors(null, "auth");
-    } else if (activeSection === "recents" && recentAlbums.length > 0) {
-      const firstAlbumImage = recentAlbums[0]?.images?.[1]?.url;
-      if (firstAlbumImage) {
-        updateGradientColors(firstAlbumImage, "recents");
-      }
-    } else if (activeSection === "library" && userPlaylists.length > 0) {
-      updateGradientColors(null, "library");
-    } else if (activeSection === "artists" && topArtists.length > 0) {
-      const firstArtistImage = topArtists[0]?.images?.[1]?.url;
-      if (firstArtistImage) {
-        updateGradientColors(firstArtistImage, "artists");
-      }
-    } else if (activeSection === "radio") {
-      updateGradientColors(null, "radio");
-    } else if (activeSection === "settings") {
-      updateGradientColors(null, "settings");
-    } else if (activeSection === "media" && currentlyPlayingAlbum) {
-      const albumImage = currentlyPlayingAlbum?.images?.[1]?.url;
-      if (albumImage) {
-        updateGradientColors(albumImage, "media");
-      }
-    }
-  }, [
-    activeSection,
-    updateGradientColors,
-    recentAlbums,
-    userPlaylists,
-    topArtists,
-    currentlyPlayingAlbum,
-    showTutorial,
-  ]);
 
   useEffect(() => {
     if (lastConnectedDevice && isInternetConnected) {
@@ -605,54 +648,6 @@ function App() {
       enableNetworking();
     }
   }, [showTetheringScreen, enableNetworking]);
-
-  useEffect(() => {
-    const fetchImageSize = async (url) => {
-      try {
-        const response = await fetch(url);
-        const blob = await response.blob();
-        return blob.size;
-      } catch (error) {
-        console.error("Error fetching image size:", error);
-        return 0;
-      }
-    };
-
-    if (currentlyPlayingAlbum?.images?.[1]?.url) {
-      if (activeSection === "media") {
-        fetchImageSize(currentlyPlayingAlbum.images[1].url).then((size) => {
-          updateGradientColors(
-            currentlyPlayingAlbum.images[1].url,
-            "media",
-            size
-          );
-        });
-      } else if (activeSection === "recents") {
-        fetchImageSize(currentlyPlayingAlbum.images[1].url).then((size) => {
-          updateGradientColors(
-            currentlyPlayingAlbum.images[1].url,
-            "recents",
-            size
-          );
-        });
-      }
-    } else if (currentlyPlayingAlbum?.type === "local-track") {
-      if (activeSection === "recents" || activeSection === "media") {
-        updateGradientColors("/images/not-playing.webp", activeSection);
-      }
-    } else if (activeSection === "media") {
-      // For local media player, use the album art if available
-      fetchImageSize("http://localhost:5000/api/albumart").then((size) => {
-        updateGradientColors("http://localhost:5000/api/albumart", "media", size);
-      });
-    }
-    // Note: media section gradient is now handled by LocalMediaPlayer component
-  }, [
-    currentlyPlayingAlbum,
-    activeSection,
-    updateGradientColors,
-    currentlyPlayingAlbum?.images?.[1]?.url,
-  ]);
 
   const handleAuthSuccess = () => {
     const storedAccessToken = localStorage.getItem("spotifyAccessToken");
@@ -672,33 +667,27 @@ function App() {
     }
   };
 
-  const handleTutorialComplete = () => {
-    setShowTutorial(false);
-    localStorage.setItem("hasSeenTutorial", "true");
-    // Go directly to media section for Bluetooth-first experience
-    setActiveSection('media');
-  };
 
   const handleOpenContent = (id, type) => {
     setContentSourceSection(activeSection);
     setViewingContent({ id, type });
     if (type === "artist") {
-      setActiveSection("artists");
+      setActiveSectionWithLogging("artists");
     } else if (type === "album") {
-      setActiveSection("recents");
+      setActiveSectionWithLogging("recents");
     }
   };
 
   const handleNavigateToArtistFromMedia = (artistId, contentType) => {
     setContentSourceSection("media");
     setViewingContent({ id: artistId, type: contentType });
-    setActiveSection("artists");
+    setActiveSectionWithLogging("artists");
   };
 
   const handleNavigateToAlbumFromMedia = (albumId, contentType) => {
     setContentSourceSection("media");
     setViewingContent({ id: albumId, type: contentType });
-    setActiveSection("recents");
+    setActiveSectionWithLogging("recents");
   };
 
   const handleCloseContent = () => {
@@ -707,18 +696,18 @@ function App() {
     setContentSourceSection(null);
 
     if (source) {
-      setActiveSection(source);
+      setActiveSectionWithLogging(source);
     }
   };
 
   const handleNavigateToMedia = () => {
     setViewingContent(null);
-    setActiveSection("media");
+    setActiveSectionWithLogging("media");
   };
 
   const handleNavigateToArtist = (id, type) => {
     setViewingContent({ id, type });
-    setActiveSection("artists");
+    setActiveSectionWithLogging("artists");
   };
 
   const handleNetworkCancel = () => {
@@ -736,15 +725,11 @@ function App() {
   const displayNetworkBanner = false;
 
   let content;
-  if (authIsLoading && !initialCheckDone) {
-    content = null;
-  } else if (showConnectionLostScreen) {
+  if (showConnectionLostScreen) {
     content = <NetworkScreen isConnectionLost={true} deviceName={lastConnectedDevice?.name} />;
   } else if (false && !isAuthenticated && initialCheckDone) {
     // Spotify auth disabled - all functionality handled via Android companion app
     content = <AuthContainer onAuthSuccess={handleAuthSuccess} />;
-  } else if (showTutorial) {
-    content = <Tutorial onComplete={handleTutorialComplete} />;
   } else if (viewingContent) {
     content = (
       <ContentView
@@ -756,7 +741,6 @@ function App() {
         currentlyPlayingTrackUri={currentPlayback?.item?.uri}
         currentPlayback={currentPlayback}
         radioMixes={radioMixes}
-        updateGradientColors={updateGradientColors}
         setIgnoreNextRelease={setIgnoreNextRelease}
         playbackProgress={playbackProgress}
         refreshPlaybackState={refreshPlaybackState}
@@ -767,117 +751,124 @@ function App() {
       <Home
         accessToken={accessToken}
         activeSection={activeSection}
-        setActiveSection={setActiveSection}
+        setActiveSection={setActiveSectionWithLogging}
         recentAlbums={recentAlbums}
         userPlaylists={userPlaylists}
         topArtists={topArtists}
         likedSongs={likedSongs}
         radioMixes={radioMixes}
         userShows={userShows}
-        currentPlayback={currentPlayback}
-        currentlyPlayingAlbum={currentlyPlayingAlbum}
-        playbackProgress={playbackProgress}
         isLoading={isLoading}
         refreshData={refreshData}
         refreshPlaybackState={refreshPlaybackState}
         onOpenContent={handleOpenContent}
-        updateGradientColors={updateGradientColors}
         onOpenDeviceSwitcher={handleOpenDeviceSwitcher}
       />
     );
   }
 
   return (
-    <ConnectorProvider>
-      <SettingsProvider>
-        <DeviceSwitcherContext.Provider value={deviceSwitcherContextValue}>
-          <NetworkContext.Provider value={networkContextValue}>
-            <ConnectorContext.Provider value={connectorContextValue}>
-              <Router>
-                <FontLoader />
-                <main
-                  className="overflow-hidden relative min-h-screen rounded-2xl"
-                  style={{
-                    fontFamily: `var(--font-inter), var(--font-noto-sans-sc), var(--font-noto-sans-tc), var(--font-noto-serif-jp), var(--font-noto-sans-kr), var(--font-noto-naskh-ar), var(--font-noto-sans-bn), var(--font-noto-sans-dv), var(--font-noto-sans-he), var(--font-noto-sans-ta), var(--font-noto-sans-th), var(--font-noto-sans-gk), system-ui, sans-serif`,
-                    fontOpticalSizing: "auto",
-                  }}
-                >
-                  <GradientBackground gradientState={gradientState} className="bg-black" />
-
-                  <div className="relative z-10">
-                    {showLockScreen ? (
-                      <div className="fadeIn-animation">
-                        <LockScreen 
-                          onUnlock={() => {
-                            setShowLockScreen(false);
-                            setActiveSection('media'); // Return to media after unlock
-                          }}
+    <ThemeProvider>
+      <PlayerProvider
+        currentPlayback={currentPlayback}
+        currentlyPlayingAlbum={currentlyPlayingAlbum}
+        playerControls={playerControls}
+        playbackProgress={playbackProgress}
+      >
+        <ConnectorProvider>
+          <SettingsProvider>
+            <DeviceSwitcherContext.Provider value={deviceSwitcherContextValue}>
+              <NetworkContext.Provider value={networkContextValue}>
+                <ConnectorContext.Provider value={connectorContextValue}>
+                  <Router>
+                    <FontLoader />
+                    <main
+                      className="overflow-hidden relative min-h-screen rounded-2xl"
+                      style={{
+                        fontFamily: `var(--font-inter), var(--font-noto-sans-sc), var(--font-noto-sans-tc), var(--font-noto-serif-jp), var(--font-noto-sans-kr), var(--font-noto-naskh-ar), var(--font-noto-sans-bn), var(--font-noto-sans-dv), var(--font-noto-sans-he), var(--font-noto-sans-ta), var(--font-noto-sans-th), var(--font-noto-sans-gk), system-ui, sans-serif`,
+                        fontOpticalSizing: "auto",
+                      }}
+                    >
+                      <div className="relative z-10">
+                        {showLockScreen ? (
+                          <div className="fadeIn-animation">
+                            <LockScreen 
+                              onUnlock={() => {
+                                setShowLockScreen(false);
+                                setActiveSectionWithLogging('media'); // Return to media after unlock
+                              }}
+                            />
+                          </div>
+                        ) : (
+                          <div className="fadeIn-animation">
+                            {content}
+                          </div>
+                        )}
+                        {!isFlashing && !showTetheringScreen && !showConnectionLostScreen && (
+                          <>
+                            {pairingRequest ? (
+                              <PairingScreen
+                                pin={pairingRequest.pairingKey}
+                                isConnecting={isConnecting}
+                                onAccept={acceptPairing}
+                                onReject={denyPairing}
+                              />
+                            ) : null}
+                          </>
+                        )}
+                        <NetworkBanner
+                          visible={displayNetworkBanner}
+                        />
+                        <SystemUpdateModal
+                          show={isFlashing}
+                          status={updateStatus}
+                          progress={progress}
+                          isError={isError}
+                          errorMessage={errorMessage}
+                        />
+                        <DeviceSwitcherModal
+                          isOpen={isDeviceSwitcherOpen}
+                          onClose={handleCloseDeviceSwitcher}
+                          accessToken={accessToken}
+                        />
+                        {showConnectorModal && (
+                          <ConnectorQRModal
+                            onClose={() => setShowConnectorModal(false)}
+                          />
+                        )}
+                        <NetworkPasswordModal
+                          network={selectedNetwork}
+                          onClose={handleNetworkClose}
+                          onConnect={handleNetworkClose}
+                        />
+                        {showGlobalMappingOverlay && (
+                          <ButtonMappingOverlay
+                            show={showGlobalMappingOverlay}
+                            activeButton={globalActiveButton}
+                          />
+                        )}
+                        <PowerMenu
+                          isVisible={showPowerMenu}
+                          onClose={() => setShowPowerMenu(false)}
+                        />
+                        <FpsMonitor
+                          enabled={showFpsMonitor}
+                          position="top-right"
+                        />
+                        <ConsoleOverlay
+                          isVisible={showConsoleOverlay}
+                          onToggle={() => setShowConsoleOverlay(prev => !prev)}
                         />
                       </div>
-                    ) : (
-                      <div className="fadeIn-animation">
-                        {content}
-                      </div>
-                    )}
-                    {!isFlashing && !showTetheringScreen && !showConnectionLostScreen && (
-                      <>
-                        {pairingRequest ? (
-                          <PairingScreen
-                            pin={pairingRequest.pairingKey}
-                            isConnecting={isConnecting}
-                            onAccept={acceptPairing}
-                            onReject={denyPairing}
-                          />
-                        ) : null}
-                      </>
-                    )}
-                    <NetworkBanner
-                      visible={displayNetworkBanner}
-                    />
-                    <SystemUpdateModal
-                      show={isFlashing}
-                      status={updateStatus}
-                      progress={progress}
-                      isError={isError}
-                      errorMessage={errorMessage}
-                    />
-                    <DeviceSwitcherModal
-                      isOpen={isDeviceSwitcherOpen}
-                      onClose={handleCloseDeviceSwitcher}
-                      accessToken={accessToken}
-                    />
-                    {showConnectorModal && (
-                      <ConnectorQRModal
-                        onClose={() => setShowConnectorModal(false)}
-                      />
-                    )}
-                    <NetworkPasswordModal
-                      network={selectedNetwork}
-                      onClose={handleNetworkClose}
-                      onConnect={handleNetworkClose}
-                    />
-                    {!showTutorial && showGlobalMappingOverlay && (
-                      <ButtonMappingOverlay
-                        show={showGlobalMappingOverlay}
-                        activeButton={globalActiveButton}
-                      />
-                    )}
-                    <PowerMenu
-                      isVisible={showPowerMenu}
-                      onClose={() => setShowPowerMenu(false)}
-                    />
-                    <FpsMonitor
-                      enabled={showFpsMonitor}
-                      position="top-right"
-                    />
-                  </div>
-                </main>
-              </Router>
-            </ConnectorContext.Provider>
-          </NetworkContext.Provider>
-        </DeviceSwitcherContext.Provider>
-      </SettingsProvider>
-    </ConnectorProvider>
+                    </main>
+                  </Router>
+                </ConnectorContext.Provider>
+              </NetworkContext.Provider>
+            </DeviceSwitcherContext.Provider>
+          </SettingsProvider>
+        </ConnectorProvider>
+      </PlayerProvider>
+    </ThemeProvider>
   );
 }
 

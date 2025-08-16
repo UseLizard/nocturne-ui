@@ -1,7 +1,6 @@
 import { useEffect } from "react";
 import { useGradientState } from "../../hooks/useGradientState";
 import { NocturneIcon } from "../common/icons";
-import GradientBackground from "../common/GradientBackground";
 
 const PairingScreen = ({ onAccept, onReject, pin, isConnecting }) => {
   const [gradientState, updateGradientColors] = useGradientState();
@@ -13,7 +12,6 @@ const PairingScreen = ({ onAccept, onReject, pin, isConnecting }) => {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden">
       <div className="absolute inset-0 bg-black"></div>
-      <GradientBackground gradientState={gradientState} />
 
       <div className="relative z-10 w-full max-w-6xl px-6 grid grid-cols-2 gap-16 items-center">
         <div className="flex flex-col items-start space-y-8 ml-12">

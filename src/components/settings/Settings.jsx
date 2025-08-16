@@ -1,25 +1,17 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Switch } from "@headlessui/react";
 import { useNavigate } from "react-router-dom";
-import {
-  Dialog,
-  DialogPanel,
-  DialogTitle,
-  DialogBackdrop,
-} from "@headlessui/react";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
-  SettingsAccountIcon,
-  SettingsUpdateIcon,
   SettingsCreditsIcon,
   SettingsGeneralIcon,
   SettingsPlaybackIcon,
   SettingsSupportIcon,
 } from "../common/icons";
-import AccountInfo from "./AccountInfo";
-import SoftwareUpdate from "./SoftwareUpdate";
 import { useSettings } from "../../contexts/SettingsContext";
+import SettingsToggleItem from "./SettingsToggleItem";
+import SettingsActionItem from "./SettingsActionItem";
+import SettingsSponsorsList from "./SettingsSponsorsList";
 
 const settingsStructure = {
   general: {
@@ -35,56 +27,12 @@ const settingsStructure = {
         storageKey: "startWithNowPlaying",
         defaultValue: false,
       },
-      {
-        id: "show-status-bar",
-        title: "Toggle Status Bar",
-        type: "toggle",
-        description: "Show or hide the status bar at the top of the sidebar.",
-        storageKey: "showStatusBar",
-        defaultValue: true,
-      },
-      {
-        id: "24-hour-time",
-        title: "24-Hour Time",
-        type: "toggle",
-        description:
-          "Display the clock inside of the status bar in 24-hour format instead of 12-hour format.",
-        storageKey: "use24HourTime",
-        defaultValue: false,
-      },
-      {
-        id: "factory-reset",
-        title: "Factory Reset",
-        type: "action",
-        description: "Erase all stored settings and paired Bluetooth devices. This cannot be undone.",
-        action: "factoryReset",
-      },
-    ],
-  },
-  update: {
-    title: "Software Update",
-    icon: SettingsUpdateIcon,
-    items: [
-      {
-        id: "software-update",
-        type: "custom",
-        component: SoftwareUpdate,
-      },
     ],
   },
   playback: {
     title: "Playback",
     icon: SettingsPlaybackIcon,
     items: [
-      {
-        id: "track-scrolling",
-        title: "Track Name Scrolling",
-        type: "toggle",
-        description:
-          "Enable or disable the scrolling animation for the track name in the player.",
-        storageKey: "trackNameScrollingEnabled",
-        defaultValue: true,
-      },
       {
         id: "show-lyrics-gesture",
         title: "Swipe to Show Lyrics",
@@ -93,42 +41,6 @@ const settingsStructure = {
           "Enable swiping up on the track info to show the lyrics of a song.",
         storageKey: "showLyricsGestureEnabled",
         defaultValue: false,
-      },
-      {
-        id: "song-change-gesture",
-        title: "Swipe to Change Song",
-        type: "toggle",
-        description:
-          "Enable left/right swipe gestures to skip to the previous or next song.",
-        storageKey: "songChangeGestureEnabled",
-        defaultValue: true,
-      },
-      {
-        id: "elapsed-time",
-        title: "Show Time Elapsed",
-        type: "toggle",
-        description:
-          "Display the elapsed track time below the progress bar.",
-        storageKey: "elapsedTimeEnabled",
-        defaultValue: false,
-      },
-    ],
-  },
-  account: {
-    title: "Account",
-    icon: SettingsAccountIcon,
-    items: [
-      {
-        id: "profile-info",
-        title: "Profile Information",
-        type: "custom",
-      },
-      {
-        id: "sign-out",
-        title: "Sign Out",
-        type: "action",
-        description: "Sign out of your Spotify account.",
-        action: "signOut",
       },
     ],
   },
@@ -510,8 +422,6 @@ export default function Settings({
   setActiveSection,
 }) {
   const navigate = useNavigate();
-  const [userProfile, setUserProfile] = useState(null);
-  const [versionInfo, setVersionInfo] = useState("Loading versions...");
   const [activeParent, setActiveParent] = useState(null);
   const [activeSubItem, setActiveSubItem] = useState(null);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -519,7 +429,6 @@ export default function Settings({
   const isProcessingEscape = useRef(false);
   const scrollContainerRef = useRef(null);
   const { settings, updateSetting } = useSettings();
-  const [showFactoryResetDialog, setShowFactoryResetDialog] = useState(false);
 
   const [showMain, setShowMain] = useState(true);
   const [showParent, setShowParent] = useState(false);
@@ -541,66 +450,14 @@ export default function Settings({
     );
   }, []);
 
-  useEffect(() => {
-    setTimeout(() => {
-      setVersionInfo("Client version: 3.0.0\nOS version: 1.0.0");
-    }, 1000);
-
-    if (accessToken) {
-      fetchSpotifyProfile();
-    }
-  }, [accessToken]);
-
-  const fetchSpotifyProfile = async () => {
-    try {
-      const response = await fetch("https://api.spotify.com/v1/me", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-      const profile = await response.json();
-      setUserProfile(profile);
-    } catch (error) {
-      console.error("Error fetching Spotify profile:", error);
-    }
-  };
 
   const handleToggle = (key) => {
     updateSetting(key, !settings[key]);
   };
 
-  const handleFactoryReset = async () => {
-    try {
-      fetch("http://localhost:5000/device/factoryreset", { method: "POST" })
-      setShowFactoryResetDialog(false);
-    } catch (error) {
-      console.error("Error during factory reset:", error);
-      setShowFactoryResetDialog(false);
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      localStorage.removeItem("spotifyAccessToken");
-      localStorage.removeItem("spotifyRefreshToken");
-      localStorage.removeItem("spotifyTokenExpiry");
-      localStorage.removeItem("spotifyAuthType");
-      window.location.reload();
-    } catch (error) {
-      console.error("Error during sign out:", error);
-      localStorage.clear();
-      window.location.reload();
-    }
-  };
 
   const handleAction = (action) => {
     switch (action) {
-      case "factoryReset":
-        setShowFactoryResetDialog(true);
-        break;
-      case "signOut":
-        handleSignOut();
-        break;
       case "openDonation":
         onOpenDonationModal();
         break;
@@ -701,80 +558,28 @@ export default function Settings({
     switch (item.type) {
       case "toggle":
         return (
-          <div key={item.id} className="mb-8">
-            <div className="flex items-center">
-              <Switch
-                checked={settings[item.storageKey]}
-                onChange={() => handleToggle(item.storageKey)}
-                className={`relative inline-flex h-11 w-20 flex-shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${settings[item.storageKey] ? "bg-white/40" : "bg-white/10"
-                  }`}
-              >
-                <span
-                  className={`pointer-events-none inline-block h-10 w-10 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${settings[item.storageKey]
-                      ? "translate-x-9"
-                      : "translate-x-0"
-                    }`}
-                />
-              </Switch>
-              <span className="ml-3 text-[32px] font-[580] text-white tracking-tight">
-                {item.title}
-              </span>
-            </div>
-            <p className="pt-4 text-[28px] font-[560] text-white/60 max-w-[380px] tracking-tight">
-              {item.description}
-            </p>
-          </div>
+          <SettingsToggleItem
+            key={item.id}
+            item={item}
+            value={settings[item.storageKey]}
+            onChange={() => handleToggle(item.storageKey)}
+          />
         );
       case "action":
         return (
-          <div key={item.id} className="mb-8">
-            <button
-              onClick={() => handleAction(item.action)}
-              className="bg-white/10 hover:bg-white/20 w-80 transition-colors duration-200 rounded-[12px] px-6 py-3 border border-white/10 focus:outline-none"
-            >
-              <span className="text-[32px] font-[580] text-white tracking-tight">
-                {item.title}
-              </span>
-            </button>
-            <p className="pt-4 text-[28px] font-[560] text-white/60 max-w-[380px] tracking-tight">
-              {item.description}
-            </p>
-          </div>
+          <SettingsActionItem
+            key={item.id}
+            item={item}
+            onAction={handleAction}
+          />
         );
       case "sponsors":
         return (
-          <div key={item.id} className="mb-8">
-            <h3 className="text-[32px] font-[580] text-white tracking-tight mb-4">
-              {item.title}
-            </h3>
-            <div className="space-y-2">
-              {item.names.map((name, index) => (
-                <p
-                  key={`${item.id}-${index}`}
-                  className="text-[28px] font-[560] text-white/60 tracking-tight"
-                >
-                  {name}
-                </p>
-              ))}
-            </div>
-          </div>
+          <SettingsSponsorsList
+            key={item.id}
+            item={item}
+          />
         );
-      case "info":
-        return (
-          <div key={item.id} className="mb-8">
-            <p className="text-[20px] font-[560] text-white/60 max-w-[380px] tracking-tight whitespace-pre-line">
-              {item.id === "nocturne-version" ? versionInfo : item.description}
-            </p>
-          </div>
-        );
-      case "custom":
-        if (item.component) {
-          const Component = item.component;
-          return <Component key={item.id} />;
-        } else if (item.id === "profile-info") {
-          return <AccountInfo key={item.id} userProfile={userProfile} />;
-        }
-        return null;
       default:
         return null;
     }
@@ -945,60 +750,6 @@ export default function Settings({
         </div>
       </div>
 
-      <Dialog
-        open={showFactoryResetDialog}
-        onClose={() => setShowFactoryResetDialog(false)}
-        className="relative z-50"
-      >
-        <DialogBackdrop
-          transition
-          className="fixed inset-0 bg-black/60 transition-opacity data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in"
-        />
-
-        <div className="fixed inset-0 z-50 w-screen overflow-y-auto">
-          <div
-            className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0"
-            style={{ fontFamily: "var(--font-inter)" }}
-          >
-            <DialogPanel
-              transition
-              className="relative transform overflow-hidden rounded-[17px] bg-[#161616] px-0 pb-0 pt-5 text-left shadow-xl transition-all data-[closed]:translate-y-4 data-[closed]:opacity-0 data-[enter]:duration-300 data-[leave]:duration-200 data-[enter]:ease-out data-[leave]:ease-in sm:my-8 sm:w-full sm:max-w-[36rem] data-[closed]:sm:translate-y-0 data-[closed]:sm:scale-95"
-            >
-              <div>
-                <div className="text-center">
-                  <DialogTitle
-                    as="h3"
-                    className="text-[36px] font-[560] tracking-tight text-white"
-                  >
-                    Factory Reset?
-                  </DialogTitle>
-                  <div className="mt-2">
-                    <p className="text-[28px] font-[560] tracking-tight text-white/60">
-                      This will erase all stored settings and paired Bluetooth devices. This cannot be undone.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <div className="mt-5 sm:grid sm:grid-flow-row-dense sm:grid-cols-2 sm:gap-0 border-t border-slate-100/25">
-                <button
-                  type="button"
-                  onClick={() => setShowFactoryResetDialog(false)}
-                  className="inline-flex w-full justify-center px-3 py-3 text-[28px] font-[560] tracking-tight text-[#6c8bd5] shadow-sm sm:col-start-1 border-r border-slate-100/25 bg-transparent hover:bg-white/5 focus:outline-none"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleFactoryReset}
-                  className="mt-3 inline-flex w-full justify-center px-3 py-3 text-[28px] font-[560] tracking-tight text-[#fe3b30] shadow-sm sm:col-start-2 sm:mt-0 bg-transparent hover:bg-white/5 focus:outline-none"
-                >
-                  Reset
-                </button>
-              </div>
-            </DialogPanel>
-          </div>
-        </div>
-      </Dialog>
     </div>
   );
 }

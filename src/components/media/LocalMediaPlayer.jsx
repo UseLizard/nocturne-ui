@@ -5,7 +5,6 @@ import { useGestureControls } from '../../hooks/useGestureControls';
 import { useGradientState } from '../../hooks/useGradientState';
 import ScrollingText from '../common/ScrollingText';
 import DoubleBufferedImage from '../common/DoubleBufferedImage';
-import GradientBackground from '../common/GradientBackground';
 import {
   BluetoothIcon,
   SmartphoneIcon,
@@ -202,9 +201,56 @@ const VOLUME_MAX = 100;
 const VOLUME_STEP = Math.round(100 / 13); // ~7.69, rounded to 8 for 13 steps
 const VOLUME_STEPS = 13; // Number of discrete volume levels
 
-const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => {
+// Get file size of image for change detection
+const getImageFileSize = async (imageUrl) => {
+  if (!imageUrl) return null;
+  
+  try {
+    const response = await fetch(imageUrl, { 
+      method: 'HEAD',
+      cache: 'no-cache' 
+    });
+    
+    if (response.ok) {
+      const contentLength = response.headers.get('content-length');
+      return contentLength ? parseInt(contentLength, 10) : null;
+    }
+    
+    // Fallback: return URL length if content-length not available
+    return imageUrl.length;
+  } catch (error) {
+    // Fallback: return URL length if fetch fails
+    return imageUrl.length;
+  }
+};
+
+const LocalMediaPlayer = ({ className = "", onClose }) => {
+  
+  console.log('🎵 LOCAL MEDIA PLAYER: Component mounting/updating', {
+    timestamp: new Date().toISOString()
+  });
+
+  // Force browser repaint - fixes UI delay after physical button presses
+  const forceRepaint = useCallback(() => {
+    // Gentle repaint using transform on container only
+    const container = containerRef.current;
+    if (container) {
+      // Trigger repaint without hiding elements
+      const currentTransform = container.style.transform;
+      container.style.transform = currentTransform ? `${currentTransform} translateZ(0.1px)` : 'translateZ(0.1px)';
+      requestAnimationFrame(() => {
+        container.style.transform = currentTransform || '';
+      });
+    }
+    
+    // Alternative method: trigger reflow on body
+    document.body.offsetHeight;
+  }, []);
   const containerRef = useRef(null);
   const contentContainerRef = useRef(null);
+  const [currentAlbumArtSize, setCurrentAlbumArtSize] = useState(null);
+  const [confirmedAlbumArtUrl, setConfirmedAlbumArtUrl] = useState(null);
+  const [lastCheckedTrack, setLastCheckedTrack] = useState(null);
   const [volumeOverlayState, setVolumeOverlayState] = useState({
     visible: false,
     animation: "hidden"
@@ -254,7 +300,9 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
 
   const handlePlayPause = useCallback(async () => {
     await togglePlayPause();
-  }, [togglePlayPause]);
+    // Force repaint to ensure UI updates are immediately visible
+    forceRepaint();
+  }, [togglePlayPause, forceRepaint]);
 
   const handleSkipNext = useCallback(async () => {
     await next();
@@ -274,7 +322,9 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     const roundedVolume = Math.max(VOLUME_MIN, Math.min(VOLUME_MAX, step * VOLUME_STEP));
     await setVolume(roundedVolume);
     lastVolumeChangeTimeRef.current = Date.now(); // Mark volume change time
-  }, [setVolume]);
+    // Force repaint to ensure volume changes are immediately visible
+    forceRepaint();
+  }, [setVolume, forceRepaint]);
 
   // Calculate progress percentage - updates with position
   const progressPercentage = duration && position ? (position / duration) * 100 : 0;
@@ -410,18 +460,95 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
     };
   }, [handlePlayPause, isTapping, scrubbingMode, seekTo]);
 
-  // Update local gradient state when album art changes
+  // Check file size and conditionally update album art
   useEffect(() => {
-    if (albumArtUrl) {
-      // Update local gradient state
-      setGradientState(albumArtUrl, 'media', 0, currentTrack);
+    console.log('🎵 LOCAL MEDIA PLAYER: Album art effect triggered', {
+      currentAlbumArtSize,
+      currentTrack,
+      currentArtist,
+      currentAlbum,
+      isPlaying,
+      lastCheckedTrack,
+      timestamp: new Date().toISOString()
+    });
+    
+    // Check album art whenever media state changes (play/pause/track/artist/album)
+    const checkAndUpdateAlbumArt = async () => {
+      // Use base URL without timestamp for stable size comparison
+      const baseAlbumArtUrl = 'http://localhost:5000/api/albumart';
       
-      // Also update global gradient if the callback is provided
-      if (updateGradientColors) {
-        updateGradientColors(albumArtUrl, 'media');
+      console.log('🎵 LOCAL MEDIA PLAYER: Checking album art on media state change', {
+        currentTrack,
+        currentArtist, 
+        currentAlbum,
+        isPlaying,
+        albumArtUrl,
+        baseUrl: baseAlbumArtUrl,
+        timestamp: new Date().toISOString()
+      });
+      
+      const newSize = await getImageFileSize(baseAlbumArtUrl);
+      
+      console.log('🎵 LOCAL MEDIA PLAYER: File size comparison', {
+        newSize,
+        currentAlbumArtSize,
+        changed: newSize !== currentAlbumArtSize
+      });
+      
+      const isTrackChange = lastCheckedTrack !== currentTrack;
+      
+      // Update if file size changed OR if this is a new track (force check on track change)
+      if ((newSize !== currentAlbumArtSize || isTrackChange) && (currentTrack || currentArtist || currentAlbum)) {
+        console.log('🎵 LOCAL MEDIA PLAYER: Album art update triggered', {
+          sizeChanged: newSize !== currentAlbumArtSize,
+          trackChanged: isTrackChange,
+          newSize,
+          currentAlbumArtSize,
+          hasAlbumArtUrl: !!albumArtUrl
+        });
+        
+        setCurrentAlbumArtSize(newSize);
+        setLastCheckedTrack(currentTrack);
+        
+        // Use timestamped URL for actual display to bust cache
+        const timestampedUrl = `${baseAlbumArtUrl}?t=${Date.now()}`;
+        setConfirmedAlbumArtUrl(timestampedUrl);
+        
+        // Update local gradient state
+        setGradientState(timestampedUrl, 'media', 0, currentTrack);
+        console.log('🎵 LOCAL MEDIA PLAYER: Album art updated');
+      } else if (newSize === currentAlbumArtSize && !isTrackChange) {
+        console.log('🎵 LOCAL MEDIA PLAYER: Album art unchanged, no update needed');
+      } else {
+        console.log('🎵 LOCAL MEDIA PLAYER: No valid media info, skipping album art update');
       }
+    };
+    
+    // Check if we have some media information
+    if (currentTrack || currentArtist || currentAlbum) {
+      checkAndUpdateAlbumArt();
+      
+      // If this is a track change and no confirmed album art yet, retry after a short delay
+      // This handles the race condition between track change and album art cached messages
+      const isTrackChange = lastCheckedTrack !== currentTrack;
+      if (isTrackChange && !confirmedAlbumArtUrl) {
+        console.log('🎵 LOCAL MEDIA PLAYER: Track changed but no confirmed album art, retrying in 100ms');
+        setTimeout(() => {
+          checkAndUpdateAlbumArt();
+        }, 100);
+      }
+    } else {
+      console.log('🎵 LOCAL MEDIA PLAYER: No media info available for album art check');
     }
-  }, [albumArtUrl, setGradientState, updateGradientColors]);
+  }, [setGradientState, currentTrack, isPlaying, currentArtist, currentAlbum]);
+
+  // Component cleanup
+  useEffect(() => {
+    console.log('🎵 LOCAL MEDIA PLAYER: Component mounted');
+    return () => {
+      console.log('🎵 LOCAL MEDIA PLAYER: Component unmounting');
+    };
+  }, []);
 
   // Debounce isPlaying state to prevent flicker after seeking
   useEffect(() => {
@@ -457,6 +584,8 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
           setScrubbingMode(true);
           setScrubbingPosition(position);
           scrubbingStartPositionRef.current = position;
+          // Force repaint to show scrubbing mode immediately
+          forceRepaint();
         }
       } else if (e.key === 'Enter') {
         e.preventDefault();
@@ -491,6 +620,8 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
           clearTimeout(scrubbingTimeoutRef.current);
           scrubbingTimeoutRef.current = null;
         }
+        // Force repaint to hide scrubbing mode immediately
+        forceRepaint();
       }
     };
 
@@ -501,7 +632,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
       document.removeEventListener('keydown', handleKeyDown, true);
       document.removeEventListener('keyup', handleKeyUp, true);
     };
-  }, [scrubbingMode, position, seekTo, handlePlayPause]);
+  }, [scrubbingMode, position, seekTo, handlePlayPause, forceRepaint]);
 
   // Show volume overlay with animation
   const showVolumeOverlay = useCallback(() => {
@@ -516,6 +647,9 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
       animation: "showing"
     });
     
+    // Force repaint to ensure volume overlay is immediately visible
+    forceRepaint();
+    
     volumeTimerRef.current = setTimeout(() => {
       setVolumeOverlayState(prev => ({
         ...prev,
@@ -529,7 +663,7 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
         });
       }, 300);
     }, 1000); // 1 second timeout
-  }, []);
+  }, [forceRepaint]);
 
   // Cleanup volume timer
   useEffect(() => {
@@ -665,11 +799,16 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
       ref={containerRef}
     >
       {/* Global Gradient Background */}
-      <GradientBackground gradientState={gradientState} className="absolute inset-0 -z-10 bg-black" />
       
       {/* Scrubbing Mode Overlay */}
       {scrubbingMode && (
-        <div className="absolute inset-0 z-50 bg-black/60 flex flex-col items-center justify-center pointer-events-none">
+        <div 
+          className="absolute inset-0 z-50 bg-black/60 flex flex-col items-center justify-center pointer-events-none"
+          style={{
+            willChange: 'opacity, transform',
+            transform: 'translateZ(0)' // Force GPU acceleration
+          }}
+        >
           {/* Delta indicator */}
           {scrubbingStartPositionRef.current !== null && scrubbingPosition !== null && (
             <div className="text-white/70 text-2xl font-medium mb-4">
@@ -739,37 +878,38 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
             style={{ width: 280, height: 280 }}
           >
             {/* Debug info */}
-            {false && albumArtUrl && (
+            {false && confirmedAlbumArtUrl && (
               <div className="absolute top-0 left-0 bg-black/80 text-white text-xs p-2">
-                <div>URL: {albumArtUrl}</div>
+                <div>URL: {confirmedAlbumArtUrl}</div>
+                <div>Size: {currentAlbumArtSize} bytes</div>
                 <div>Connected: {isConnected ? 'Yes' : 'No'}</div>
                 <div>Track: {currentTrack || 'None'}</div>
               </div>
             )}
-            {albumArtUrl && (currentTrack || currentAlbum || currentArtist) ? (
-              <DoubleBufferedImage
-                src={albumArtUrl}
-                alt={`${currentAlbum || currentTrack} album art`}
-                className="w-full h-full object-cover"
-                onLoad={() => {
-                  // Update local gradient state when image loads
-                  if (albumArtUrl) {
-                    setGradientState(albumArtUrl, 'media', 0, currentTrack);
-                    
-                    // Also update global gradient if the callback is provided
-                    if (updateGradientColors) {
-                      updateGradientColors(albumArtUrl, 'media');
-                    }
+            {(currentTrack || currentAlbum || currentArtist) ? (
+              confirmedAlbumArtUrl ? (
+                <DoubleBufferedImage
+                  src={confirmedAlbumArtUrl}
+                  alt={`${currentAlbum || currentTrack} album art`}
+                  className="w-full h-full object-cover"
+                  onLoad={() => {
+                    // Image is confirmed to be different, no need for additional checks
+                    // Gradient updates already handled in the useEffect above
+                  }}
+                  fallback={
+                    <div className="text-center">
+                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mb-2"></div>
+                      <div className="text-green-300 text-xs">Android Connected</div>
+                    </div>
                   }
-                }}
-                fallback={
-                  <div className="text-center">
-                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mb-2"></div>
-                    <div className="text-green-300 text-xs">Android Connected</div>
-                  </div>
-                }
-                transitionDuration={500}
-              />
+                  transitionDuration={500}
+                />
+              ) : (
+                <div className="text-center">
+                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mb-2"></div>
+                  <div className="text-green-300 text-xs">Loading Album Art...</div>
+                </div>
+              )
             ) : !wsConnected ? (
               <div className="text-center">
                 <div className="text-red-400 text-sm mb-2">WebSocket Disconnected</div>
@@ -947,7 +1087,9 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
               MozAppearance: 'none', 
               WebkitTapHighlightColor: 'transparent',
               opacity: loading || !isConnected ? 0.5 : 1,
-              pointerEvents: loading || !isConnected ? 'none' : 'auto'
+              pointerEvents: loading || !isConnected ? 'none' : 'auto',
+              willChange: 'opacity, transform',
+              transform: 'translateZ(0)' // Force GPU acceleration
             }}
             role="button"
             aria-label={isPlaying ? "Pause" : "Play"}
@@ -1070,7 +1212,9 @@ const LocalMediaPlayer = ({ className = "", onClose, updateGradientColors }) => 
         }`}
         style={{
           zIndex: 50,
-          width: '70%'
+          width: '70%',
+          willChange: 'opacity, transform',
+          transform: 'translateX(-50%) translateZ(0)' // Force GPU acceleration
         }}
       >
         <div className="bg-black/80 rounded-lg px-4 py-2">

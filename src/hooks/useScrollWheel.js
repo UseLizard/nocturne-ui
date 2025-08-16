@@ -145,7 +145,7 @@ export const useMediaScrollWheel = ({
 
 /**
  * Navigation-specific scroll wheel hook for item navigation
- * Used by Home, ContentView, Tutorial, etc.
+ * Used by Home, ContentView, etc.
  */
 export const useNavigationScrollWheel = ({
   containerRef,

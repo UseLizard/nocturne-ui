@@ -19,7 +19,6 @@ export function useNetwork() {
   const listenerIdRef = useRef(null);
   const checkInProgressRef = useRef(false);
 
-  const isInTutorial = !localStorage.getItem("hasSeenTutorial");
 
   const updateConnectionStatus = useCallback((newIsConnected) => {
     setIsConnected(prev => {
@@ -32,13 +31,13 @@ export function useNetwork() {
         setShowNetworkBanner(false);
         window.dispatchEvent(new Event('networkBannerHide'));
         window.dispatchEvent(new Event('networkRestored'));
-      } else if (!isInTutorial) {
+      } else {
         setShowNetworkBanner(true);
         window.dispatchEvent(new Event('networkBannerShow'));
       }
       return newIsConnected;
     });
-  }, [isInTutorial, hasEverConnectedThisSession]);
+  }, [hasEverConnectedThisSession]);
 
   const performNetworkCheck = useCallback(async () => {
     if (checkInProgressRef.current) return;
