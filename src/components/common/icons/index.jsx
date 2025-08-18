@@ -77,3 +77,4 @@ export { default as FilterIcon } from "./FilterIcon";
 export { default as TrashIcon } from "./TrashIcon";
 export { default as SunIcon } from "./SunIcon";
 export { default as MoonIcon } from "./MoonIcon";
+export { default as GradientIcon } from "./GradientIcon";

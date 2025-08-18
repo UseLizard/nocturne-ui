@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { useColorTransition } from '../../hooks/useColorTransition';
+import { useGradientTransition } from '../../hooks/useGradientTransition';
 
 function ColorTransitionTester() {
-  const { transitionToColor, resetToDefault } = useColorTransition();
+  const { transitionToColor, resetToDefault } = useGradientTransition();
   const [duration, setDuration] = useState(2000);
   const [easing, setEasing] = useState('cubic-bezier(0.25, 0.46, 0.45, 0.94)');
 

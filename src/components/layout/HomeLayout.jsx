@@ -68,7 +68,7 @@ const HomeLayout = ({
   }, [activeSection]);
 
   // Render full-screen sections
-  if (activeSection === "media" || activeSection === "weather") {
+  if (activeSection === "media" || activeSection === "weather" || activeSection === "gradients") {
     console.log('🏠 HOME LAYOUT: Rendering full-screen section:', activeSection);
     return (
       <div className="relative min-h-screen rounded-2xl overflow-hidden">

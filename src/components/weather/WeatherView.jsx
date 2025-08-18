@@ -41,14 +41,14 @@ const WeatherView = ({ setActiveSection }) => {
 
     try {
       const response = await apiRequest('/api/weather/current', 'GET');
-      if (response && (response.hourly_data || response.weekly_data)) {
+      if (response && (response.hourly || response.weekly)) {
         setWeatherData(response);
         setLoading(false);
         retryCountRef.current = 0;
       } else {
         if (retryCountRef.current < MAX_RETRIES) {
           retryCountRef.current++;
-          await apiRequest('/api/weather/refresh', 'POST');
+          // No refresh endpoint available - just retry the current endpoint
           retryTimeoutRef.current = setTimeout(fetchWeatherData, RETRY_DELAY);
         } else {
           setError("Failed to refresh weather data. Please try again later.");
@@ -119,8 +119,8 @@ const WeatherView = ({ setActiveSection }) => {
   });
 
   const weatherTabs = useMemo(() => {
-    const hourlyHours = weatherData?.hourly_data?.hours;
-    const weeklyDays = weatherData?.weekly_data?.days;
+    const hourlyHours = weatherData?.hourly?.hours;
+    const weeklyDays = weatherData?.weekly?.days;
 
     return [
       {

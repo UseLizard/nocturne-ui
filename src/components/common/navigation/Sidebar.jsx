@@ -8,6 +8,7 @@ import {
   SettingsIcon,
   LockIcon,
   SunIcon,
+  GradientIcon,
 } from "../../common/icons";
 import StatusBar from "./StatusBar";
 import { useSettings } from "../../../contexts/SettingsContext";
@@ -61,6 +62,7 @@ export default function Sidebar({ activeSection, setActiveSection }) {
       <SidebarItem section="artists" icon={ArtistsIcon} label="Artists" />
       <SidebarItem section="radio" icon={RadioIcon} label="Radio" />
       <SidebarItem section="podcasts" icon={PodcastIcon} label="Podcasts" />
+      <SidebarItem section="gradients" icon={GradientIcon} label="Gradients" />
       <SidebarItem section="weather" icon={SunIcon} label="Weather" />
       <SidebarItem section="lockscreen" icon={LockIcon} label="Lock Screen" />
       <SidebarItem section="settings" icon={SettingsIcon} label="Settings" />

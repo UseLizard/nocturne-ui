@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import Settings from '../settings/Settings';
 import LocalMediaPlayer from '../media/LocalMediaPlayer';
 import WeatherView from '../weather/WeatherView';
+import GradientViewer from '../gradients/GradientViewer';
 import RecentsSection from '../content/RecentsSection';
 import LibrarySection from '../content/LibrarySection';
 import ArtistsSection from '../content/ArtistsSection';
@@ -173,6 +174,8 @@ const ContentArea = ({
             setActiveSection={setActiveSection}
           />
         );
+      case "gradients":
+        return <GradientViewer setActiveSection={setActiveSection} />;
       case "weather":
         return <WeatherView setActiveSection={setActiveSection} />;
       default:

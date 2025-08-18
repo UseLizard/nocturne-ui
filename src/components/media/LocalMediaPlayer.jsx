@@ -3,8 +3,11 @@ import { useLocalMedia } from '../../hooks/useLocalMedia';
 import { useNavigation } from '../../hooks/useNavigation';
 import { useGestureControls } from '../../hooks/useGestureControls';
 import { useGradientState } from '../../hooks/useGradientState';
+import { useLivePosition } from '../../hooks/useLivePosition';
+
 import ScrollingText from '../common/ScrollingText';
 import DoubleBufferedImage from '../common/DoubleBufferedImage';
+import LiveAlbumArt from '../common/LiveAlbumArt';
 import {
   BluetoothIcon,
   SmartphoneIcon,
@@ -201,28 +204,7 @@ const VOLUME_MAX = 100;
 const VOLUME_STEP = Math.round(100 / 13); // ~7.69, rounded to 8 for 13 steps
 const VOLUME_STEPS = 13; // Number of discrete volume levels
 
-// Get file size of image for change detection
-const getImageFileSize = async (imageUrl) => {
-  if (!imageUrl) return null;
-  
-  try {
-    const response = await fetch(imageUrl, { 
-      method: 'HEAD',
-      cache: 'no-cache' 
-    });
-    
-    if (response.ok) {
-      const contentLength = response.headers.get('content-length');
-      return contentLength ? parseInt(contentLength, 10) : null;
-    }
-    
-    // Fallback: return URL length if content-length not available
-    return imageUrl.length;
-  } catch (error) {
-    // Fallback: return URL length if fetch fails
-    return imageUrl.length;
-  }
-};
+// Removed: getImageFileSize function - no longer needed with LiveAlbumArt component
 
 const LocalMediaPlayer = ({ className = "", onClose }) => {
   
@@ -248,9 +230,7 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
   }, []);
   const containerRef = useRef(null);
   const contentContainerRef = useRef(null);
-  const [currentAlbumArtSize, setCurrentAlbumArtSize] = useState(null);
-  const [confirmedAlbumArtUrl, setConfirmedAlbumArtUrl] = useState(null);
-  const [lastCheckedTrack, setLastCheckedTrack] = useState(null);
+  // Removed: Complex album art state management - now handled by LiveAlbumArt component
   const [volumeOverlayState, setVolumeOverlayState] = useState({
     visible: false,
     animation: "hidden"
@@ -271,6 +251,10 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
   
   // Use local gradient state
   const [gradientState, setGradientState] = useGradientState('media');
+  
+  // Get live position updates via WebSocket
+  const { position: livePosition, isConnected: livePositionConnected } = useLivePosition();
+  
   const {
     isConnected,
     wsConnected,
@@ -293,6 +277,9 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     checkMediaStatus,
     initialLoadComplete
   } = useLocalMedia();
+  
+  // Use live position when available, fallback to regular position
+  const currentPosition = livePositionConnected ? livePosition : position;
 
   const handleRetry = () => {
     checkMediaStatus();
@@ -326,8 +313,14 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     forceRepaint();
   }, [setVolume, forceRepaint]);
 
-  // Calculate progress percentage - updates with position
-  const progressPercentage = duration && position ? (position / duration) * 100 : 0;
+  const handleAlbumArtLoad = useCallback((event) => {
+    // Update gradient colors when new album art loads
+    console.log('🎵 LOCAL MEDIA PLAYER: Live album art loaded, updating gradient');
+    setGradientState(event.target.src, 'media', 0, currentTrack);
+  }, [setGradientState, currentTrack]);
+
+  // Calculate progress percentage - updates with live position
+  const progressPercentage = duration && currentPosition ? (currentPosition / duration) * 100 : 0;
 
   // Determine media mode based on track duration (>15 minutes = podcast mode)
   const PODCAST_THRESHOLD = 15 * 60 * 1000; // 15 minutes in milliseconds
@@ -335,18 +328,18 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
 
   // 30-second skip functions for podcast mode
   const handleSkipBackward30s = useCallback(async () => {
-    if (position && position >= 30000) {
-      await seekTo(position - 30000);
+    if (currentPosition && currentPosition >= 30000) {
+      await seekTo(currentPosition - 30000);
     } else {
       await seekTo(0);
     }
-  }, [position, seekTo]);
+  }, [currentPosition, seekTo]);
 
   const handleSkipForward30s = useCallback(async () => {
-    if (position && duration && position + 30000 <= duration) {
-      await seekTo(position + 30000);
+    if (currentPosition && duration && currentPosition + 30000 <= duration) {
+      await seekTo(currentPosition + 30000);
     }
-  }, [position, duration, seekTo]);
+  }, [currentPosition, duration, seekTo]);
 
   // Convert time to display format
   const convertTimeToLength = (ms) => {
@@ -460,87 +453,7 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     };
   }, [handlePlayPause, isTapping, scrubbingMode, seekTo]);
 
-  // Check file size and conditionally update album art
-  useEffect(() => {
-    console.log('🎵 LOCAL MEDIA PLAYER: Album art effect triggered', {
-      currentAlbumArtSize,
-      currentTrack,
-      currentArtist,
-      currentAlbum,
-      isPlaying,
-      lastCheckedTrack,
-      timestamp: new Date().toISOString()
-    });
-    
-    // Check album art whenever media state changes (play/pause/track/artist/album)
-    const checkAndUpdateAlbumArt = async () => {
-      // Use base URL without timestamp for stable size comparison
-      const baseAlbumArtUrl = 'http://localhost:5000/api/albumart';
-      
-      console.log('🎵 LOCAL MEDIA PLAYER: Checking album art on media state change', {
-        currentTrack,
-        currentArtist, 
-        currentAlbum,
-        isPlaying,
-        albumArtUrl,
-        baseUrl: baseAlbumArtUrl,
-        timestamp: new Date().toISOString()
-      });
-      
-      const newSize = await getImageFileSize(baseAlbumArtUrl);
-      
-      console.log('🎵 LOCAL MEDIA PLAYER: File size comparison', {
-        newSize,
-        currentAlbumArtSize,
-        changed: newSize !== currentAlbumArtSize
-      });
-      
-      const isTrackChange = lastCheckedTrack !== currentTrack;
-      
-      // Update if file size changed OR if this is a new track (force check on track change)
-      if ((newSize !== currentAlbumArtSize || isTrackChange) && (currentTrack || currentArtist || currentAlbum)) {
-        console.log('🎵 LOCAL MEDIA PLAYER: Album art update triggered', {
-          sizeChanged: newSize !== currentAlbumArtSize,
-          trackChanged: isTrackChange,
-          newSize,
-          currentAlbumArtSize,
-          hasAlbumArtUrl: !!albumArtUrl
-        });
-        
-        setCurrentAlbumArtSize(newSize);
-        setLastCheckedTrack(currentTrack);
-        
-        // Use timestamped URL for actual display to bust cache
-        const timestampedUrl = `${baseAlbumArtUrl}?t=${Date.now()}`;
-        setConfirmedAlbumArtUrl(timestampedUrl);
-        
-        // Update local gradient state
-        setGradientState(timestampedUrl, 'media', 0, currentTrack);
-        console.log('🎵 LOCAL MEDIA PLAYER: Album art updated');
-      } else if (newSize === currentAlbumArtSize && !isTrackChange) {
-        console.log('🎵 LOCAL MEDIA PLAYER: Album art unchanged, no update needed');
-      } else {
-        console.log('🎵 LOCAL MEDIA PLAYER: No valid media info, skipping album art update');
-      }
-    };
-    
-    // Check if we have some media information
-    if (currentTrack || currentArtist || currentAlbum) {
-      checkAndUpdateAlbumArt();
-      
-      // If this is a track change and no confirmed album art yet, retry after a short delay
-      // This handles the race condition between track change and album art cached messages
-      const isTrackChange = lastCheckedTrack !== currentTrack;
-      if (isTrackChange && !confirmedAlbumArtUrl) {
-        console.log('🎵 LOCAL MEDIA PLAYER: Track changed but no confirmed album art, retrying in 100ms');
-        setTimeout(() => {
-          checkAndUpdateAlbumArt();
-        }, 100);
-      }
-    } else {
-      console.log('🎵 LOCAL MEDIA PLAYER: No media info available for album art check');
-    }
-  }, [setGradientState, currentTrack, isPlaying, currentArtist, currentAlbum]);
+  // Removed: Complex album art checking logic - now handled by LiveAlbumArt component
 
   // Component cleanup
   useEffect(() => {
@@ -582,8 +495,8 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
         if (!scrubbingMode) {
           // Enter scrubbing mode immediately when pressing "1"
           setScrubbingMode(true);
-          setScrubbingPosition(position);
-          scrubbingStartPositionRef.current = position;
+          setScrubbingPosition(currentPosition);
+          scrubbingStartPositionRef.current = currentPosition;
           // Force repaint to show scrubbing mode immediately
           forceRepaint();
         }
@@ -717,7 +630,7 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
         
         // Use functional setState to ensure accumulation works with rapid scrolling
         setScrubbingPosition(currentScrubbingPos => {
-          const currentPos = currentScrubbingPos ?? position;
+          const currentPos = currentScrubbingPos ?? currentPosition;
           return Math.max(0, Math.min(duration || 0, currentPos + seekStep));
         });
         
@@ -762,7 +675,7 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     return () => {
       container.removeEventListener('wheel', handleWheel);
     };
-  }, [isConnected, loading, volume, handleVolumeChange, showVolumeOverlay, scrubbingMode, position, duration, seekTo]);
+  }, [isConnected, loading, volume, handleVolumeChange, showVolumeOverlay, scrubbingMode, currentPosition, duration, seekTo]);
   
   // For compatibility with removed hook
   const manualVolumeChangeRef = useRef(false);
@@ -877,39 +790,19 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
             className="aspect-square rounded-[12px] bg-white/10 flex items-center justify-center overflow-hidden relative"
             style={{ width: 280, height: 280 }}
           >
-            {/* Debug info */}
-            {false && confirmedAlbumArtUrl && (
-              <div className="absolute top-0 left-0 bg-black/80 text-white text-xs p-2">
-                <div>URL: {confirmedAlbumArtUrl}</div>
-                <div>Size: {currentAlbumArtSize} bytes</div>
-                <div>Connected: {isConnected ? 'Yes' : 'No'}</div>
-                <div>Track: {currentTrack || 'None'}</div>
-              </div>
-            )}
+            {/* Live Album Art - Automatically updates via WebSocket */}
             {(currentTrack || currentAlbum || currentArtist) ? (
-              confirmedAlbumArtUrl ? (
-                <DoubleBufferedImage
-                  src={confirmedAlbumArtUrl}
-                  alt={`${currentAlbum || currentTrack} album art`}
-                  className="w-full h-full object-cover"
-                  onLoad={() => {
-                    // Image is confirmed to be different, no need for additional checks
-                    // Gradient updates already handled in the useEffect above
-                  }}
-                  fallback={
-                    <div className="text-center">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mb-2"></div>
-                      <div className="text-green-300 text-xs">Android Connected</div>
-                    </div>
-                  }
-                  transitionDuration={500}
-                />
-              ) : (
-                <div className="text-center">
-                  <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mb-2"></div>
-                  <div className="text-green-300 text-xs">Loading Album Art...</div>
-                </div>
-              )
+              <LiveAlbumArt
+                className="w-full h-full object-cover"
+                onLoad={handleAlbumArtLoad}
+                fallback={
+                  <div className="text-center">
+                    <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse mb-2"></div>
+                    <div className="text-green-300 text-xs">Loading Album Art...</div>
+                  </div>
+                }
+                transitionDuration={500}
+              />
             ) : !wsConnected ? (
               <div className="text-center">
                 <div className="text-red-400 text-sm mb-2">WebSocket Disconnected</div>
@@ -1021,7 +914,7 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
             progress={progressPercentage}
             isPlaying={isPlaying}
             durationMs={duration || 0}
-            positionMs={position || 0}
+            positionMs={currentPosition || 0}
             onSeek={handleSeek}
             onScrubbingChange={(scrubbing) => {
               // Handle scrubbing state if needed for disabling other controls
@@ -1035,7 +928,7 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
           {isConnected && duration && (
             <div className="flex justify-between mt-2">
               <span className="text-white/60 text-[20px]">
-                {convertTimeToLength(position)}
+                {convertTimeToLength(currentPosition)}
               </span>
               <span className="text-white/60 text-[20px]">
                 {convertTimeToLength(duration)}

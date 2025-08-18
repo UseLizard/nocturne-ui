@@ -1,6 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useLocalMedia } from '../../hooks/useLocalMedia';
-import { PlayIcon, PauseIcon, SkipForwardIcon, SkipBackwardIcon, LockIcon } from '../common/icons';
+import { PlayIcon, PauseIcon, SkipForwardIcon, SkipBackwardIcon, LockIcon, GradientIcon } from '../common/icons';
 import { SunIcon, MoonIcon } from '../common/icons';
 
 const LockScreen = ({ onUnlock }) => {
@@ -10,6 +10,8 @@ const LockScreen = ({ onUnlock }) => {
   const [isUnlocking, setIsUnlocking] = useState(false);
   const [trackSwipeStart, setTrackSwipeStart] = useState(null);
   const [currentGradient, setCurrentGradient] = useState('');
+  const [gradientImageUrl, setGradientImageUrl] = useState(null);
+  const [isGeneratedGradientMode, setIsGeneratedGradientMode] = useState(false);
   const [showVolumeIndicator, setShowVolumeIndicator] = useState(false);
   const containerRef = useRef(null);
   const volumeTimeoutRef = useRef(null);
@@ -55,6 +57,65 @@ const LockScreen = ({ onUnlock }) => {
 
     return () => clearInterval(timer);
   }, [isManualOverride]);
+
+  // Store previous URL for cleanup
+  const previousUrlRef = useRef(null);
+
+  // Fetch latest generated gradient
+  const fetchLatestGradient = useCallback(async () => {
+    if (!isGeneratedGradientMode) return;
+    
+    try {
+      const response = await fetch('http://localhost:5000/api/gradients/latest');
+      if (response.ok) {
+        const blob = await response.blob();
+        const imageUrl = URL.createObjectURL(blob);
+        
+        // Only update if we got a new image
+        setGradientImageUrl(prevUrl => {
+          // Clean up previous URL
+          if (previousUrlRef.current && previousUrlRef.current !== prevUrl) {
+            URL.revokeObjectURL(previousUrlRef.current);
+          }
+          previousUrlRef.current = prevUrl;
+          return imageUrl;
+        });
+      } else {
+        console.warn('Failed to fetch latest gradient:', response.status);
+      }
+    } catch (error) {
+      console.error('Error fetching gradient:', error);
+    }
+  }, [isGeneratedGradientMode]); // Removed gradientImageUrl dependency
+
+  // Fetch gradient when mode is enabled or component mounts
+  useEffect(() => {
+    if (isGeneratedGradientMode) {
+      fetchLatestGradient();
+      
+      // Refresh gradient every 2 minutes when in generated mode (less frequent)
+      const interval = setInterval(fetchLatestGradient, 120000);
+      return () => clearInterval(interval);
+    } else {
+      // Clean up when switching away from generated mode
+      if (gradientImageUrl) {
+        URL.revokeObjectURL(gradientImageUrl);
+        setGradientImageUrl(null);
+      }
+    }
+  }, [isGeneratedGradientMode, fetchLatestGradient]);
+
+  // Clean up gradient URLs on unmount
+  useEffect(() => {
+    return () => {
+      if (gradientImageUrl) {
+        URL.revokeObjectURL(gradientImageUrl);
+      }
+      if (previousUrlRef.current) {
+        URL.revokeObjectURL(previousUrlRef.current);
+      }
+    };
+  }, []);
 
   // Initialize gradient on mount
   useEffect(() => {
@@ -270,6 +331,10 @@ const LockScreen = ({ onUnlock }) => {
     setIsManualOverride(true);
   };
 
+  const toggleGradientMode = () => {
+    setIsGeneratedGradientMode(!isGeneratedGradientMode);
+  };
+
   const handlePlayPause = async (e) => {
     e.stopPropagation();
     await togglePlayPause();
@@ -293,6 +358,23 @@ const LockScreen = ({ onUnlock }) => {
   const dateInfo = formatDate(currentTime);
   const timeInfo = formatTime(currentTime);
 
+  // Determine background style based on mode (memoized to prevent flickering)
+  const backgroundStyle = useMemo(() => {
+    if (isGeneratedGradientMode && gradientImageUrl) {
+      return {
+        backgroundImage: `url(${gradientImageUrl})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        transition: 'background-image 800ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+      };
+    } else {
+      return {
+        background: currentGradient,
+        transition: 'background 1200ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
+      };
+    }
+  }, [isGeneratedGradientMode, gradientImageUrl, currentGradient]);
 
   return (
     <div
@@ -300,10 +382,7 @@ const LockScreen = ({ onUnlock }) => {
       className={`fixed inset-0 z-50 transition-all duration-700 ${
         isUnlocking ? 'translate-y-[-100%]' : ''
       }`}
-      style={{
-        background: currentGradient,
-        transition: 'background 1200ms cubic-bezier(0.25, 0.46, 0.45, 0.94)'
-      }}
+      style={backgroundStyle}
     >
       {/* Main Content */}
       <div 
@@ -409,6 +488,22 @@ const LockScreen = ({ onUnlock }) => {
         )}
       </div>
 
+      {/* Gradient Mode Toggle - Top Left */}
+      <button
+        onClick={toggleGradientMode}
+        className={`absolute top-8 left-8 w-16 h-16 rounded-full transition-gentle flex items-center justify-center focus:outline-none ${
+          isDayMode 
+            ? 'bg-black/5 hover:bg-black/10' 
+            : 'bg-white/5 hover:bg-white/10'
+        }`}
+        title={isGeneratedGradientMode ? "Switch to time-based gradient" : "Switch to generated gradient"}
+      >
+        <GradientIcon className={`w-6 h-6 transition-gentle ${
+          isGeneratedGradientMode 
+            ? (isDayMode ? 'text-black/70' : 'text-white/70')
+            : (isDayMode ? 'text-black/30' : 'text-white/30')
+        }`} />
+      </button>
 
       {/* Day/Night Toggle - Bottom Right */}
       <button
