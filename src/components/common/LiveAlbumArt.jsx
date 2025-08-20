@@ -20,8 +20,8 @@ const LiveAlbumArt = ({
 
   const updateAlbumArt = () => {
     const timestamp = Date.now();
-    const finalUrl = `http://localhost:5000/api/albumart?t=${timestamp}`;
-    console.log('🎨 LIVE ALBUM ART: Updating album art URL for new_album_art_set message', { finalUrl, timestamp });
+    const finalUrl = `http://localhost:5000/api/v2/album-art/current?t=${timestamp}`;
+    console.log('🎨 LIVE ALBUM ART: Updating album art URL for media/album_art_available message', { finalUrl, timestamp });
     setAlbumArtUrl(finalUrl);
   };
 
@@ -41,8 +41,8 @@ const LiveAlbumArt = ({
         try {
           const data = JSON.parse(event.data);
           
-          if (data.type === 'new_album_art_set') {
-            console.log('🎨 LIVE ALBUM ART: Received new_album_art_set WebSocket message:', data);
+          if (data.type === 'media/album_art_available') {
+            console.log('🎨 LIVE ALBUM ART: Received media/album_art_available WebSocket message:', data);
             updateAlbumArt();
           }
         } catch (error) {

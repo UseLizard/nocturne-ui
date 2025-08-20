@@ -40,7 +40,7 @@ const WeatherView = ({ setActiveSection }) => {
     setError(null);
 
     try {
-      const response = await apiRequest('/api/weather/current', 'GET');
+      const response = await apiRequest('/api/v2/weather/current', 'GET');
       if (response && (response.hourly || response.weekly)) {
         setWeatherData(response);
         setLoading(false);

@@ -1019,7 +1019,7 @@ export const useBluetooth = () => {
   // BLE-specific functions
   const getBleStatus = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE}/media/ble/status`);
+      const response = await fetch(`${API_BASE}/api/v2/bluetooth/status`);
       if (!response.ok) {
         throw new Error('Failed to get BLE status');
       }

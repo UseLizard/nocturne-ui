@@ -1,13 +1,13 @@
 import React, { useRef, useCallback, useState, useEffect, useMemo, memo } from 'react';
-import { useLocalMedia } from '../../hooks/useLocalMedia';
+import { useNocturnedMedia } from '../../hooks/useNocturnedMedia';
 import { useNavigation } from '../../hooks/useNavigation';
 import { useGestureControls } from '../../hooks/useGestureControls';
 import { useGradientState } from '../../hooks/useGradientState';
-import { useLivePosition } from '../../hooks/useLivePosition';
 
 import ScrollingText from '../common/ScrollingText';
 import DoubleBufferedImage from '../common/DoubleBufferedImage';
 import LiveAlbumArt from '../common/LiveAlbumArt';
+import TrackInfoTextLive from './TrackInfoTextLive';
 import {
   BluetoothIcon,
   SmartphoneIcon,
@@ -252,8 +252,6 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
   // Use local gradient state
   const [gradientState, setGradientState] = useGradientState('media');
   
-  // Get live position updates via WebSocket
-  const { position: livePosition, isConnected: livePositionConnected } = useLivePosition();
   
   const {
     isConnected,
@@ -267,22 +265,25 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     duration,
     position,
     volume,
-    albumArtUrl,
     togglePlayPause,
     next,
     previous,
     seekTo,
     setVolume,
     formatTime,
-    checkMediaStatus,
+    checkMediaStatus: refreshMediaState,
     initialLoadComplete
-  } = useLocalMedia();
+  } = useNocturnedMedia();
   
-  // Use live position when available, fallback to regular position
-  const currentPosition = livePositionConnected ? livePosition : position;
+  // Use position from nocturned directly - it provides live updates via WebSocket
+  const currentPosition = position;
+  
+  // Album art URL - LiveAlbumArt component handles the actual loading
+  const albumArtUrl = (currentTrack || currentAlbum || currentArtist) ? 
+    `http://localhost:5000/api/albumart?t=${Date.now()}` : null;
 
   const handleRetry = () => {
-    checkMediaStatus();
+    refreshMediaState();
   };
 
   const handlePlayPause = useCallback(async () => {
@@ -319,10 +320,16 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     setGradientState(event.target.src, 'media', 0, currentTrack);
   }, [setGradientState, currentTrack]);
 
+  const handleTrackChange = useCallback((trackInfo) => {
+    // Update gradient when track changes
+    console.log('🎵 LOCAL MEDIA PLAYER: Track changed:', trackInfo);
+    // This will trigger album art reload which will update the gradient
+  }, []);
+
   // Calculate progress percentage - updates with live position
   const progressPercentage = duration && currentPosition ? (currentPosition / duration) * 100 : 0;
 
-  // Determine media mode based on track duration (>15 minutes = podcast mode)
+  // Get media mode from track info (will be handled by TrackInfoTextLive)
   const PODCAST_THRESHOLD = 15 * 60 * 1000; // 15 minutes in milliseconds
   const mediaMode = duration && duration > PODCAST_THRESHOLD ? 'podcast' : 'song';
 
@@ -855,54 +862,12 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
           </div>
         </div>
 
-        {/* Track and Artist Info - Adapted for Song/Podcast Mode */}
-        <div className="flex-1 text-center md:text-left">
-          <div className="max-w-[400px]">
-            <ScrollingText
-              text={currentTrack || (isConnected ? "No media playing" : "No device connected")}
-              className="text-4xl font-semibold text-white tracking-tight"
-              maxWidth="400px"
-              pauseDuration={1000}
-              pixelsPerSecond={40}
-            />
-          </div>
-          {/* Debug info */}
-          {false && (
-            <div className="text-xs text-white/40 mt-2">
-              <div>Mode: {mediaMode}</div>
-              <div>Track: {currentTrack || 'null'}</div>
-              <div>Artist: {currentArtist || 'null'}</div>
-              <div>Album: {currentAlbum || 'null'}</div>
-              <div>Duration: {duration}ms</div>
-            </div>
-          )}
-          {/* Song mode - show album and artist */}
-          {mediaMode === 'song' && currentTrack && (
-            <>
-              <h4 className="text-[36px] font-[560] text-white/60 tracking-tight max-w-[380px] truncate">
-                {currentAlbum || 'Unknown Album'}
-              </h4>
-              <h4 className="text-[28px] font-[500] text-white/50 mt-1 tracking-tight max-w-[380px] truncate">
-                {currentArtist || 'Unknown Artist'}
-              </h4>
-            </>
-          )}
-          
-          {/* Podcast mode or no track - show artist/message only */}
-          {(mediaMode === 'podcast' || !currentTrack) && (
-            <h4 className="text-[28px] font-[500] text-white/50 mt-1 tracking-tight max-w-[380px] truncate">
-              {currentArtist || (isConnected ? "Start playing music on your Android device" : "Pair your Android device")}
-            </h4>
-          )}
-          
-          {/* Mode indicator */}
-          {isConnected && currentTrack && (
-            <div className="mt-2">
-              <span className="text-[20px] font-[500] text-white/40 capitalize">
-                {mediaMode} mode • {convertTimeToLength(duration)}
-              </span>
-            </div>
-          )}
+        {/* Track and Artist Info - Live Component */}
+        <div className="flex-1">
+          <TrackInfoTextLive 
+            isConnected={isConnected}
+            onTrackChange={handleTrackChange}
+          />
         </div>
       </div>
 

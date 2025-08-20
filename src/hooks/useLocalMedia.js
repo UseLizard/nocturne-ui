@@ -64,6 +64,7 @@ export const useLocalMedia = () => {
   const sendCommand = useCallback(async (command, params = {}) => {
     // Don't show loading indicator for commands - it causes the dots to appear
     try {
+      // Use v1 compatibility endpoints which are maintained in v2 server
       let endpoint = `/media/${command}`;
       if (command === 'seek' && params.positionMs !== undefined) {
         endpoint = `/media/seek/${params.positionMs}`;
@@ -180,7 +181,7 @@ export const useLocalMedia = () => {
       const { filename, track_id, artist, album } = data.payload;
       console.log('Album art updated:', filename, track_id);
       
-      // Always use the current album art endpoint with cache busting
+      // Use album art endpoint with cache busting (v1 compatibility maintained in v2)
       setAlbumArtUrl(`http://localhost:5000/api/albumart?t=${Date.now()}`);
     } else if (data.type === 'media/album_art_cached') {
       // Album art is already cached - always set URL for track changes
@@ -195,8 +196,8 @@ export const useLocalMedia = () => {
   // --- Effects for Initialization and Animation ---
   useEffect(() => {
     const listenerId = addMessageListener('local-media', handleWsMessage);
-    // Initial status check
-    apiRequest('/media/status')
+    // Initial status check using v2 API
+    apiRequest('/api/v2/media/current')
       .then(status => {
         if (status) {
           setIsConnected(status.connected);
@@ -268,7 +269,7 @@ export const useLocalMedia = () => {
   const checkMediaStatus = useCallback(async () => {
     setLoading(true);
     try {
-      const status = await apiRequest('/media/status');
+      const status = await apiRequest('/api/v2/media/current');
       if (status) {
         setIsConnected(status.connected);
         if (status.state) {
