@@ -10,7 +10,7 @@ import DoubleBufferedImage from './DoubleBufferedImage';
 const LiveAlbumArt = ({ 
   className, 
   fallback, 
-  transitionDuration = 500,
+  transitionDuration = 750,
   onLoad 
 }) => {
   const [albumArtUrl, setAlbumArtUrl] = useState('');

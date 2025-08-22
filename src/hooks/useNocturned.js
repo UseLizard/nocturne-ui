@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { networkAwareRequest, waitForNetwork } from '../utils/networkAwareRequest';
+import { useWebSocket } from './useWebSocket';
+import webSocketService from '../services/WebSocketService';
 
-const API_BASE = 'http://localhost:5000';
-
-let globalWsRef = null;
-let globalWsListeners = [];
-let wsInitialized = false;
+const API_BASE = window.location.hostname === 'localhost' 
+  ? 'http://localhost:5000' 
+  : `http://${window.location.hostname}:5000`;
 
 let isInitializingDiscovery = false;
 let isStoppingDiscovery = false;
@@ -21,20 +21,20 @@ const clearConnectQueue = () => {
 };
 
 export const addGlobalWsListener = (id, handlers) => {
-  const listener = {
-    id,
-    ...handlers
-  };
-  globalWsListeners.push(listener);
-
-  if (!wsInitialized) {
-    setupGlobalWebSocket();
-    wsInitialized = true;
+  // Legacy compatibility - route to new WebSocket service
+  const normalizedHandlers = {};
+  
+  if (handlers.onMessage) {
+    normalizedHandlers['*'] = handlers.onMessage;
+  }
+  if (handlers.onOpen) {
+    // Connect to websocket when adding first listener
+    if (!webSocketService.isConnected('NOCTURNED')) {
+      webSocketService.connect('NOCTURNED');
+    }
   }
   
-  return () => {
-    globalWsListeners = globalWsListeners.filter(l => l.id !== id);
-  };
+  return webSocketService.addListener('NOCTURNED', id, normalizedHandlers);
 };
 
 let retryIsCancelled = false;
@@ -104,87 +104,32 @@ const processConnectQueue = async () => {
   }
 };
 
+// Legacy function - now handled by WebSocketService
 const setupGlobalWebSocket = async () => {
-  if (globalWsRef) return;
-
-  try {
-    console.log('Connecting to WebSocket...');
-    const socket = new WebSocket(`ws://${API_BASE.replace('http://', '')}/ws`);
-    globalWsRef = socket;
-
-    socket.onopen = () => {
-      console.log('Connected to WebSocket');
-      globalWsListeners.forEach(listener => listener.onOpen && listener.onOpen(socket));
-    };
-
-    socket.onclose = () => {
-      console.log('Disconnected from WebSocket');
-      globalWsListeners.forEach(listener => listener.onClose && listener.onClose());
-      globalWsRef = null;
-      
-      // Attempt to reconnect after a delay
-      setTimeout(() => {
-        console.log('Attempting to reconnect WebSocket...');
-        if (!globalWsRef && globalWsListeners.length > 0) {
-          setupGlobalWebSocket();
-        }
-      }, 3000); // Wait 3 seconds before reconnecting
-    };
-
-    socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        globalWsListeners.forEach(listener => listener.onMessage && listener.onMessage(data));
-      } catch (err) {
-        console.error('WebSocket message error:', err);
-      }
-    };
-
-    socket.onerror = (err) => {
-      console.error('WebSocket error:', err);
-      globalWsListeners.forEach(listener => listener.onError && listener.onError(err));
-      socket.close();
-    };
-  } catch (error) {
-    console.error('Error setting up WebSocket:', error);
+  // Auto-connect if not already connected
+  if (!webSocketService.isConnected('NOCTURNED')) {
+    webSocketService.connect('NOCTURNED');
   }
 };
 
 export const useNocturned = () => {
+  // Get connection status from the main media hook to avoid multiple connections
   const [wsConnected, setWsConnected] = useState(false);
-  const listenerIdRef = useRef(null);
-
+  
+  // Check WebSocket connection status periodically
   useEffect(() => {
-    if (!wsInitialized) {
-      setupGlobalWebSocket();
-      wsInitialized = true;
-    }
-
-    const listenerId = `nocturned-${Date.now()}`;
-    listenerIdRef.current = listenerId;
-
-    globalWsListeners.push({
-      id: listenerId,
-      onOpen: () => {
-        setWsConnected(true);
-      },
-      onClose: () => {
-        setWsConnected(false);
-      },
-      onError: () => {
-        setWsConnected(false);
-      }
-    });
-
-    if (globalWsRef && globalWsRef.readyState === WebSocket.OPEN) {
-      setWsConnected(true);
-    }
-
-    return () => {
-      globalWsListeners = globalWsListeners.filter(
-        listener => listener.id !== listenerId
-      );
+    const checkConnection = () => {
+      // This is a simple way to check if we're connected without creating another WebSocket
+      fetch(`${API_BASE}/api/v2/health`)
+        .then(response => response.ok)
+        .then(isHealthy => setWsConnected(isHealthy))
+        .catch(() => setWsConnected(false));
     };
+    
+    checkConnection();
+    const interval = setInterval(checkConnection, 5000); // Check every 5 seconds
+    
+    return () => clearInterval(interval);
   }, []);
 
   const apiRequest = useCallback(async (endpoint, method = 'GET', body = null) => {
@@ -219,20 +164,13 @@ export const useNocturned = () => {
   }, []);
 
   const addMessageListener = useCallback((id, messageHandler) => {
-    const listenerId = `${id}-${Date.now()}`;
-
-    globalWsListeners.push({
-      id: listenerId,
-      onMessage: messageHandler
-    });
-
+    const listenerId = webSocketService.generateListenerId(id);
+    webSocketService.addListener('NOCTURNED', listenerId, { '*': messageHandler });
     return listenerId;
   }, []);
 
   const removeMessageListener = useCallback((listenerId) => {
-    globalWsListeners = globalWsListeners.filter(
-      listener => listener.id !== listenerId
-    );
+    webSocketService.removeListener('NOCTURNED', listenerId);
   }, []);
 
   return {

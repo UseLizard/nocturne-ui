@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useNocturned } from '../../hooks/useNocturned';
+import { useWeatherData } from '../../hooks/useWeatherData';
 import { useNavigationScrollWheel } from '../../hooks/useScrollWheel';
 import { useTheme } from '../../contexts/ThemeContext';
 import { isNightTime } from '../../utils/weatherUtils';
@@ -11,65 +11,17 @@ import { RefreshIcon, ChevronLeftIcon } from '../common/icons';
 import TabbedView from '../common/TabbedView';
 import ErrorMessage from '../common/ErrorMessage';
 
-const MAX_RETRIES = 3;
-const RETRY_DELAY = 5000; // 5 seconds
-
 const WeatherView = ({ setActiveSection }) => {
-  const { wsConnected, apiRequest } = useNocturned();
+  // Use the new weather data hook for real-time updates
+  const { weatherData, loading, error, wsConnected, refreshWeatherData } = useWeatherData();
   const { setTheme } = useTheme();
-  const [weatherData, setWeatherData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
   const [viewMode, setViewMode] = useState('hourly');
   const [isDayMode, setIsDayMode] = useState(() => !isNightTime());
 
   const hourlyScrollRef = useRef(null);
   const weeklyScrollRef = useRef(null);
-  const retryTimeoutRef = useRef(null);
-  const retryCountRef = useRef(0);
 
-  const fetchWeatherData = useCallback(async () => {
-    if (!wsConnected) return;
-
-    if (retryTimeoutRef.current) {
-      clearTimeout(retryTimeoutRef.current);
-      retryTimeoutRef.current = null;
-    }
-
-    setLoading(true);
-    setError(null);
-
-    try {
-      const response = await apiRequest('/api/v2/weather/current', 'GET');
-      if (response && (response.hourly || response.weekly)) {
-        setWeatherData(response);
-        setLoading(false);
-        retryCountRef.current = 0;
-      } else {
-        if (retryCountRef.current < MAX_RETRIES) {
-          retryCountRef.current++;
-          // No refresh endpoint available - just retry the current endpoint
-          retryTimeoutRef.current = setTimeout(fetchWeatherData, RETRY_DELAY);
-        } else {
-          setError("Failed to refresh weather data. Please try again later.");
-          setLoading(false);
-        }
-      }
-    } catch (err) {
-      setError('Failed to load weather data');
-      setLoading(false);
-    }
-  }, [wsConnected, apiRequest]);
-
-  useEffect(() => {
-    fetchWeatherData();
-    // Cleanup timeout on unmount
-    return () => {
-      if (retryTimeoutRef.current) {
-        clearTimeout(retryTimeoutRef.current);
-      }
-    };
-  }, [fetchWeatherData]);
+  // Weather data is now handled by useWeatherData hook with real-time updates
 
   useEffect(() => {
     setIsDayMode(!isNightTime());
@@ -96,8 +48,7 @@ const WeatherView = ({ setActiveSection }) => {
   }, [isDayMode, setTheme]);
 
   const handleManualRefresh = () => {
-    retryCountRef.current = 0;
-    fetchWeatherData();
+    refreshWeatherData();
   };
 
   const handleForecastScroll = useCallback((direction) => {

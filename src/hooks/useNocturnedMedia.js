@@ -1,70 +1,103 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useWebSocket } from './useWebSocket';
 
 // Direct connection to nocturned backend for live media updates
-const NOCTURNED_BASE = 'http://localhost:5000';
+// Use current host to work both in development and on Car Thing
+const NOCTURNED_BASE = window.location.hostname === 'localhost' 
+  ? 'http://localhost:5000' 
+  : `http://${window.location.hostname}:5000`;
 
-let globalNocturnedWs = null;
-let globalNocturnedListeners = [];
-let nocturnedWsInitialized = false;
-
-const setupNocturnedWebSocket = async () => {
-  if (globalNocturnedWs) return;
-
-  try {
-    console.log('🎵 Connecting to nocturned WebSocket...');
-    const socket = new WebSocket(`ws://localhost:5000/ws`);
-    globalNocturnedWs = socket;
-
-    socket.onopen = () => {
-      console.log('🎵 Connected to nocturned WebSocket');
-      globalNocturnedListeners.forEach(listener => listener.onOpen && listener.onOpen(socket));
-    };
-
-    socket.onclose = () => {
-      console.log('🎵 Disconnected from nocturned WebSocket');
-      globalNocturnedListeners.forEach(listener => listener.onClose && listener.onClose());
-      globalNocturnedWs = null;
-      
-      // Attempt to reconnect after a delay
-      setTimeout(() => {
-        console.log('🎵 Attempting to reconnect to nocturned WebSocket...');
-        if (!globalNocturnedWs && globalNocturnedListeners.length > 0) {
-          setupNocturnedWebSocket();
-        }
-      }, 3000);
-    };
-
-    socket.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        console.log('🎵 Received nocturned WebSocket message:', data);
-        globalNocturnedListeners.forEach(listener => listener.onMessage && listener.onMessage(data));
-      } catch (err) {
-        console.error('🎵 Nocturned WebSocket message error:', err);
-      }
-    };
-
-    socket.onerror = (err) => {
-      console.error('🎵 Nocturned WebSocket error:', err);
-      globalNocturnedListeners.forEach(listener => listener.onError && listener.onError(err));
-      socket.close();
-    };
-  } catch (error) {
-    console.error('🎵 Error setting up nocturned WebSocket:', error);
-  }
-};
+// Legacy function - now handled by WebSocketService
+// Removed duplicate WebSocket connection setup
 
 export const useNocturnedMedia = () => {
-  const [wsConnected, setWsConnected] = useState(false);
   const [mediaState, setMediaState] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [clientPosition, setClientPosition] = useState(0);
-  const listenerIdRef = useRef(null);
   const animationFrameRef = useRef(null);
   const lastServerStateRef = useRef(null);
   const lastClientUpdateRef = useRef(Date.now());
+
+  // WebSocket message handlers for media updates
+  const mediaMessageHandlers = {
+    'media/state_update': (data) => {
+      console.log('🎵 Full media state update received:', data.payload);
+      const newState = data.payload;
+      
+      // This is a full state update - update everything
+      setMediaState(newState);
+      setIsConnected(true);
+      setError(null);
+      
+      // Update position tracking
+      setClientPosition(newState.position_ms || 0);
+      lastServerStateRef.current = newState;
+      lastClientUpdateRef.current = Date.now();
+    },
+    'media/position_update': (data) => {
+      console.log('🎵 Live position update received:', data.payload);
+      const newState = data.payload;
+      
+      // This is a live position update - only update position
+      if (mediaState) {
+        setMediaState(prev => ({
+          ...prev,
+          position_ms: newState.position_ms
+        }));
+      }
+      setClientPosition(newState.position_ms || 0);
+    },
+    'playing_time': (data) => {
+      console.log('🎵 Playing time update received:', data.payload.position_ms);
+      const positionMs = data.payload.position_ms;
+      
+      // Update position in media state and client position
+      if (mediaState) {
+        setMediaState(prev => ({
+          ...prev,
+          position_ms: positionMs
+        }));
+      }
+      setClientPosition(positionMs || 0);
+    },
+    'bluetooth/connected': () => {
+      console.log('🎵 Bluetooth connected');
+      setIsConnected(true);
+      setError(null);
+    },
+    'bluetooth/disconnected': () => {
+      console.log('🎵 Bluetooth disconnected');
+      setIsConnected(false);
+      setMediaState(null);
+    },
+    'media/album_art_received': () => {
+      console.log('🎵 Album art received');
+      // Album art updates are handled by LiveAlbumArt component
+    },
+    // Weather updates (for useWeatherData hook)
+    'weather_update': (data) => {
+      console.log('🌤️ Weather update received');
+      // Weather updates will be handled by components that need them
+    },
+    // Album art updates (for ThemeContext)
+    'album_art_update': (data) => {
+      console.log('🎨 Album art update received');
+      // Album art updates for theming
+    },
+    'new_album_art_set': (data) => {
+      console.log('🎨 New album art set received');
+      // New album art set for gradient colors
+    },
+    'gradient_colors': (data) => {
+      console.log('🌈 Gradient colors received');
+      // Gradient color updates
+    },
+  };
+
+  // Use centralized WebSocket service
+  const { isConnected: wsConnected } = useWebSocket('NOCTURNED', mediaMessageHandlers);
 
   // Media command functions using v1 compatibility endpoints
   const sendMediaCommand = useCallback(async (command, params = {}) => {
@@ -146,95 +179,22 @@ export const useNocturnedMedia = () => {
     }
   }, []);
 
-  // WebSocket message handler
-  const handleWsMessage = useCallback((data) => {
-    console.log('🎵 Processing WebSocket message:', data.type, data);
-    
-    switch (data.type) {
-      case 'media/state_update':
-        console.log('🎵 Media state update received:', data.payload);
-        const newState = data.payload;
-        setMediaState(newState);
-        setIsConnected(true);
-        setError(null);
-        
-        // Update position tracking
-        setClientPosition(newState.position_ms || 0);
-        lastServerStateRef.current = newState;
-        lastClientUpdateRef.current = Date.now();
-        break;
-        
-      case 'bluetooth/connected':
-        console.log('🎵 Bluetooth connected');
-        setIsConnected(true);
-        setError(null);
-        break;
-        
-      case 'bluetooth/disconnected':
-        console.log('🎵 Bluetooth disconnected');
-        setIsConnected(false);
-        setMediaState(null);
-        break;
-        
-      case 'media/album_art_received':
-        console.log('🎵 Album art received');
-        // Album art updates are handled by LiveAlbumArt component
-        break;
-        
-      default:
-        // Ignore other message types
-        break;
-    }
-  }, []);
 
-  // Setup WebSocket connection and listener
+  // Get initial state when WebSocket connects
   useEffect(() => {
-    if (!nocturnedWsInitialized) {
-      setupNocturnedWebSocket();
-      nocturnedWsInitialized = true;
-    }
-
-    const listenerId = `nocturned-media-${Date.now()}`;
-    listenerIdRef.current = listenerId;
-
-    const listener = {
-      id: listenerId,
-      onOpen: () => {
-        console.log('🎵 Nocturned WebSocket connected');
-        setWsConnected(true);
-        setError(null);
-        // Get initial state when WebSocket connects
-        getInitialMediaState();
-      },
-      onClose: () => {
-        console.log('🎵 Nocturned WebSocket disconnected');
-        setWsConnected(false);
-      },
-      onError: (err) => {
-        console.error('🎵 Nocturned WebSocket error:', err);
-        setWsConnected(false);
-        setError('WebSocket connection error');
-      },
-      onMessage: handleWsMessage
-    };
-
-    globalNocturnedListeners.push(listener);
-
-    // Check if WebSocket is already connected
-    if (globalNocturnedWs && globalNocturnedWs.readyState === WebSocket.OPEN) {
-      setWsConnected(true);
+    if (wsConnected) {
+      console.log('🎵 Nocturned WebSocket connected');
+      setError(null);
       getInitialMediaState();
     } else {
-      // Get initial state even if WebSocket isn't connected yet
-      getInitialMediaState();
+      console.log('🎵 Nocturned WebSocket disconnected');
     }
+  }, [wsConnected, getInitialMediaState]);
 
-    return () => {
-      globalNocturnedListeners = globalNocturnedListeners.filter(
-        l => l.id !== listenerId
-      );
-    };
-  }, [handleWsMessage, getInitialMediaState]);
+  // Get initial state on component mount
+  useEffect(() => {
+    getInitialMediaState();
+  }, [getInitialMediaState]);
 
   const formatTime = useCallback((ms) => {
     if (!ms || ms < 0) return '0:00';
@@ -264,6 +224,7 @@ export const useNocturnedMedia = () => {
     duration: mediaState?.duration_ms || 0,
     position: mediaState?.position_ms || 0,
     volume: mediaState?.volume_percent || 50,
+    
     
     // Control functions
     togglePlayPause,

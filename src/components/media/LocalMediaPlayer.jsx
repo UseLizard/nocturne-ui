@@ -132,8 +132,8 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     await refreshMediaState();
     await togglePlayPause();
     // Force repaint to ensure UI updates are immediately visible
-    forceRepaint();
-  }, [togglePlayPause, forceRepaint, refreshMediaState]);
+    // forceRepaint();
+  }, [togglePlayPause, refreshMediaState]);
 
   const handleSkipNext = useCallback(async () => {
     await next();

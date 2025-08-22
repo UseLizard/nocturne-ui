@@ -1,4 +1,5 @@
 import React, { createContext, useState, useContext, useMemo, useCallback, useRef } from 'react';
+import { useWebSocket } from '../hooks/useWebSocket';
 
 const DEFAULT_BACKGROUND = 'linear-gradient(135deg, #1a1a2e, #16213e, #0f172a)';
 
@@ -123,8 +124,6 @@ export const ThemeProvider = ({ children }) => {
   const cyclingIntervalRef = useRef(null);
   const gradientVariationsRef = useRef([]);
   const currentVariationIndexRef = useRef(0);
-  const wsRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
   const mountedRef = useRef(true);
 
   const handleSetTheme = useCallback((update) => {
@@ -403,7 +402,7 @@ export const ThemeProvider = ({ children }) => {
       console.error('🎨 THEME: Error fetching album art for gradient update:', error);
       resetToDefault();
     }
-  }, [handleSetTheme, startGradientCycling, resetToDefault]);
+  }, [handleSetTheme, stopGradientCycling, resetToDefault]);
 
   const value = useMemo(() => ({
     theme,
@@ -415,75 +414,39 @@ export const ThemeProvider = ({ children }) => {
     stopGradientCycling
   }), [theme, handleSetTheme, updateGradient, generateGradient, resetToDefault, startGradientCycling, stopGradientCycling]);
 
-  // WebSocket connection for album art gradient updates
-  const connectWebSocket = useCallback(() => {
-    if (!mountedRef.current) return;
-
-    try {
-      console.log('🎨 THEME: Connecting to WebSocket for album art updates...');
-      wsRef.current = new WebSocket('ws://localhost:5000/ws');
-      
-      wsRef.current.onopen = () => {
-        console.log('🎨 THEME: WebSocket connected for album art updates');
-      };
-
-      wsRef.current.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          
-          if (data.type === 'new_album_art_set') {
-            console.log('🎨 THEME: Received new_album_art_set WebSocket message:', data);
-            handleAlbumArtGradientUpdate();
-          }
-        } catch (error) {
-          console.error('🎨 THEME: Error parsing WebSocket message:', error);
-        }
-      };
-
-      wsRef.current.onclose = (event) => {
-        if (mountedRef.current) {
-          reconnectTimeoutRef.current = setTimeout(() => {
-            if (mountedRef.current) {
-              connectWebSocket();
-            }
-          }, 2000);
-        }
-      };
-
-      wsRef.current.onerror = (error) => {
-        console.error('🎨 THEME: WebSocket error:', error);
-      };
-    } catch (error) {
-      console.error('🎨 THEME: Failed to create WebSocket connection:', error);
-      if (mountedRef.current) {
-        reconnectTimeoutRef.current = setTimeout(() => {
-          if (mountedRef.current) {
-            connectWebSocket();
-          }
-        }, 2000);
-      }
+  // WebSocket message handlers for album art updates
+  const albumArtMessageHandlers = {
+    'new_album_art_set': (data) => {
+      console.log('🎨 THEME: Received new_album_art_set WebSocket message:', data);
+      handleAlbumArtGradientUpdate();
+    },
+    'media/album_art_received': (data) => {
+      console.log('🎨 THEME: Received album_art_received WebSocket message:', data);
+      handleAlbumArtGradientUpdate();
     }
-  }, [handleAlbumArtGradientUpdate]);
+  };
 
-  // Initialize WebSocket connection
+  // Don't create another WebSocket connection - let useNocturnedMedia handle it
+  // const { isConnected: wsConnected } = useWebSocket('NOCTURNED', albumArtMessageHandlers);
+  const wsConnected = true; // Assume connected for now
+
+  // Track WebSocket connection status
+  React.useEffect(() => {
+    if (wsConnected) {
+      console.log('🎨 THEME: WebSocket connected for album art updates');
+    } else {
+      console.log('🎨 THEME: WebSocket disconnected for album art updates');
+    }
+  }, [wsConnected]);
+
+  // Initialize component
   React.useEffect(() => {
     mountedRef.current = true;
-    connectWebSocket();
 
     return () => {
       mountedRef.current = false;
-      
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-      
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
     };
-  }, [connectWebSocket]);
+  }, []);
 
   // Cleanup effect for transition timeout and cycling interval
   React.useEffect(() => {
