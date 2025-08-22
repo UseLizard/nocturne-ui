@@ -20,6 +20,7 @@ import { DeviceSwitcherContext } from "./hooks/useSpotifyPlayerControls";
 import { useBluetooth, useSystemUpdate } from "./hooks/useNocturned";
 import { useSpotifyData } from "./hooks/useSpotifyData";
 import { usePlaybackProgress } from "./hooks/usePlaybackProgress";
+import { useKeyboardShortcuts } from "./hooks/useKeyboardShortcuts";
 import { SettingsProvider } from "./contexts/SettingsContext";
 import { ConnectorProvider } from "./contexts/ConnectorContext";
 import { ThemeProvider } from "./contexts/ThemeContext";
@@ -228,7 +229,7 @@ function useGlobalButtonMapping({
     if (!isAuthenticated) return;
 
     const handleKeyDown = (e) => {
-      const validButtons = ["1", "2", "4"]; // Restored "4" to valid buttons
+      const validButtons = ["1"]; // Only button 1 for Spotify mapping, others are for overlays
       const buttonNumber = e.key;
 
       if (!validButtons.includes(buttonNumber)) return;
@@ -236,7 +237,7 @@ function useGlobalButtonMapping({
     };
 
     const handleKeyUp = (e) => {
-      const validButtons = ["1", "2", "4"]; // Restored "4" to valid buttons
+      const validButtons = ["1"]; // Only button 1 for Spotify mapping, others are for overlays
       const buttonNumber = e.key;
 
       if (!validButtons.includes(buttonNumber)) return;
@@ -306,119 +307,32 @@ function App() {
     });
   }, []);
 
-  useEffect(() => {
-    const handlePowerMenuKeyDown = (e) => {
-      
-      if (e.key.toLowerCase() === 'm' && !e.repeat && !mKeyPressStart) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        console.log('M key pressed - starting long press timer');
-        
-        // Start tracking long press
-        const pressStartTime = Date.now();
-        setMKeyPressStart(pressStartTime);
-        
-        // Set timeout for long press (800ms) - just a backup
-        longPressTimeoutRef.current = setTimeout(() => {
-          console.log('Long press timeout reached - backup timer');
-        }, 800);
+  // Screenshot function (key 5)
+  const takeScreenshot = useCallback(() => {
+    fetch('http://localhost:5000/device/screenshot', {
+      method: 'POST',
+    }).then(response => {
+      if (response.ok) {
+        console.log('Screenshot taken successfully');
+      } else {
+        console.error('Failed to take screenshot');
       }
-    };
-    
-    const handlePowerMenuKeyUp = (e) => {
-      if (e.key.toLowerCase() === 'm' && mKeyPressStart) {
-        const pressDuration = Date.now() - mKeyPressStart;
-        console.log('M key released - duration:', pressDuration);
-        
-        // Clear long press timeout
-        if (longPressTimeoutRef.current) {
-          clearTimeout(longPressTimeoutRef.current);
-          longPressTimeoutRef.current = null;
-        }
-        
-        // Check if it was a long press (>= 800ms) and trigger lockscreen
-        if (pressDuration >= 800) {
-          console.log('Long press detected - showing lockscreen');
-          setShowLockScreen(true);
-        }
-        // If it was a short press and not on lockscreen, show power menu
-        else if (!showLockScreen && !showPowerMenu) {
-          console.log('Short press detected - showing power menu');
-          setShowPowerMenu(true);
-        }
-        
-        setMKeyPressStart(null);
-      }
-    };
+    }).catch(error => {
+      console.error('Error taking screenshot:', error);
+    });
+  }, []);
 
-    document.addEventListener('keydown', handlePowerMenuKeyDown, { capture: true });
-    document.addEventListener('keyup', handlePowerMenuKeyUp, { capture: true });
-
-    return () => {
-      document.removeEventListener('keydown', handlePowerMenuKeyDown, { capture: true });
-      document.removeEventListener('keyup', handlePowerMenuKeyUp, { capture: true });
-      if (longPressTimeoutRef.current) {
-        clearTimeout(longPressTimeoutRef.current);
-        longPressTimeoutRef.current = null;
-      }
-    };
-  }, [showPowerMenu, showLockScreen, mKeyPressStart]);
-
-  // FPS monitor keyboard shortcut (2 key)
-  useEffect(() => {
-    const handleFpsToggle = (e) => {
-      if (e.key === '2' && !e.repeat) {
-        e.preventDefault();
-        e.stopPropagation();
-        setShowFpsMonitor(prev => !prev);
-        console.log('FPS monitor toggled:', !showFpsMonitor);
-      }
-    };
-
-    document.addEventListener('keydown', handleFpsToggle, { capture: true });
-
-    return () => {
-      document.removeEventListener('keydown', handleFpsToggle, { capture: true });
-    };
-  }, [showFpsMonitor]);
-
-  // Console overlay keyboard shortcut (4 key)
-  useEffect(() => {
-    const handleConsoleToggle = (e) => {
-      if (e.key === '4' && !e.repeat) {
-        e.preventDefault();
-        e.stopPropagation();
-        setShowConsoleOverlay(prev => !prev);
-        console.log('Console overlay toggled:', !showConsoleOverlay);
-      }
-    };
-
-    document.addEventListener('keydown', handleConsoleToggle, { capture: true });
-
-    return () => {
-      document.removeEventListener('keydown', handleConsoleToggle, { capture: true });
-    };
-  }, [showConsoleOverlay]);
-
-
-  // Color Transition Tester keyboard shortcut (3 key)
-  useEffect(() => {
-    const handleColorTransitionTesterToggle = (e) => {
-      if (e.key === '3' && !e.repeat) {
-        e.preventDefault();
-        e.stopPropagation();
-        setShowColorTransitionTester(prev => !prev);
-        console.log('Color Transition Tester toggled:', !showColorTransitionTester);
-      }
-    };
-
-    document.addEventListener('keydown', handleColorTransitionTesterToggle, { capture: true });
-
-    return () => {
-      document.removeEventListener('keydown', handleColorTransitionTesterToggle, { capture: true });
-    };
-  }, [showColorTransitionTester]);
+  // Use centralized keyboard shortcuts hook
+  useKeyboardShortcuts({
+    onPowerMenuShow: setShowPowerMenu,
+    onLockScreenShow: setShowLockScreen,
+    onFpsToggle: () => setShowFpsMonitor(prev => !prev),
+    onConsoleToggle: () => setShowConsoleOverlay(prev => !prev),
+    onColorTransitionTesterToggle: () => setShowColorTransitionTester(prev => !prev),
+    onScreenshot: takeScreenshot,
+    showPowerMenu,
+    showLockScreen
+  });
 
   const {
     isAuthenticated,
@@ -723,62 +637,6 @@ function App() {
                             {content}
                           </div>
                         )}
-                        {!isFlashing && !showTetheringScreen && !showConnectionLostScreen && (
-                          <>
-                            {pairingRequest ? (
-                              <PairingScreen
-                                pin={pairingRequest.pairingKey}
-                                isConnecting={isConnecting}
-                                onAccept={acceptPairing}
-                                onReject={denyPairing}
-                              />
-                            ) : null}
-                          </>
-                        )}
-                        <NetworkBanner
-                          visible={displayNetworkBanner}
-                        />
-                        <SystemUpdateModal
-                          show={isFlashing}
-                          status={updateStatus}
-                          progress={progress}
-                          isError={isError}
-                          errorMessage={errorMessage}
-                        />
-                        <DeviceSwitcherModal
-                          isOpen={isDeviceSwitcherOpen}
-                          onClose={handleCloseDeviceSwitcher}
-                          accessToken={accessToken}
-                        />
-                        {showConnectorModal && (
-                          <ConnectorQRModal
-                            onClose={() => setShowConnectorModal(false)}
-                          />
-                        )}
-                        <NetworkPasswordModal
-                          network={selectedNetwork}
-                          onClose={handleNetworkClose}
-                          onConnect={handleNetworkClose}
-                        />
-                        {showGlobalMappingOverlay && (
-                          <ButtonMappingOverlay
-                            show={showGlobalMappingOverlay}
-                            activeButton={globalActiveButton}
-                          />
-                        )}
-                        <PowerMenu
-                          isVisible={showPowerMenu}
-                          onClose={() => setShowPowerMenu(false)}
-                        />
-                        <FpsMonitor
-                          enabled={showFpsMonitor}
-                          position="top-right"
-                        />
-                        <ConsoleOverlay
-                          isVisible={showConsoleOverlay}
-                          onToggle={() => setShowConsoleOverlay(prev => !prev)}
-                        />
-                        {showColorTransitionTester && <ColorTransitionTester />}
                       </div>
                     </main>
                   </Router>

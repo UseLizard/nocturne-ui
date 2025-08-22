@@ -1,53 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useConnector } from "../contexts/ConnectorContext";
+import { useWebSocket } from './useWebSocket';
 
-let globalWsRef = null;
-let globalWsListeners = [];
-let wsInitialized = false;
-let reconnectTimeoutRef = null;
 const API_BASE = 'http://172.16.42.1:20574';
 
-const setupGlobalWebSocket = (isConnectorAvailable) => {
-  if (globalWsRef || !isConnectorAvailable) return;
-
-  const ws = new WebSocket(`ws://${API_BASE.replace('http://', '')}/ws`);
-  globalWsRef = ws;
-
-  ws.onopen = () => {
-    console.log('Network WebSocket connected');
-    globalWsListeners.forEach(listener => listener.onOpen && listener.onOpen());
-  };
-
-  ws.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data);
-      globalWsListeners.forEach(listener => listener.onMessage && listener.onMessage(data));
-    } catch (err) {
-      console.error('Connector WebSocket message error:', err);
-    }
-  };
-
-  ws.onclose = () => {
-    console.log('Connector WebSocket disconnected, reconnecting...');
-    globalWsListeners.forEach(listener => listener.onClose && listener.onClose());
-    globalWsRef = null;
-
-    if (reconnectTimeoutRef) {
-      clearTimeout(reconnectTimeoutRef);
-    }
-
-    reconnectTimeoutRef = setTimeout(() => {
-      setupGlobalWebSocket(isConnectorAvailable);
-    }, 2000);
-  };
-
-  ws.onerror = (err) => {
-    console.error('Connector WebSocket error:', err);
-    globalWsListeners.forEach(listener => listener.onError && listener.onError(err));
-
-    ws.close();
-  };
-};
+// Legacy function - now handled by WebSocketService
+// Removed duplicate WebSocket connection setup
 
 export function useWiFiNetworks() {
   const { isConnectorAvailable, isLoading: isConnectorLoading } = useConnector();
@@ -62,13 +20,28 @@ export function useWiFiNetworks() {
     forgetting: false
   });
   const [error, setError] = useState(null);
-  const [wsConnected, setWsConnected] = useState(false);
+
+  // Define stable handlers for WebSocket messages
+  const handleNetworkMessage = useCallback(() => {
+    fetchNetworkStatus();
+    scanNetworks(false);
+  }, [fetchNetworkStatus, scanNetworks]);
+
+  // WebSocket message handlers for network updates
+  const networkMessageHandlers = {
+    'network': handleNetworkMessage
+  };
+
+  // Use centralized WebSocket service only if connector is available
+  const { isConnected: wsConnected } = useWebSocket(
+    isConnectorAvailable ? 'WIFI_CONNECTOR' : null,
+    isConnectorAvailable ? networkMessageHandlers : {}
+  );
 
   const scanningRef = useRef(false);
   const statusFetchingRef = useRef(false);
   const savedFetchingRef = useRef(false);
   const pollingIntervalRef = useRef(null);
-  const listenerIdRef = useRef(null);
 
   const handleFetchError = useCallback((error, operation) => {
     console.error(`Error during ${operation}:`, error);
@@ -307,40 +280,15 @@ export function useWiFiNetworks() {
     return flagStr.includes("WPA") || flagStr.includes("WEP");
   }, []);
 
-  const handleWsMessage = useCallback((data) => {
-    if (data.type === 'network') {
-      fetchNetworkStatus();
-      scanNetworks(false);
-    }
-  }, [fetchNetworkStatus, scanNetworks]);
 
+  // Initialize networks and polling when connector becomes available
   useEffect(() => {
     if (!isConnectorLoading && !isConnectorAvailable) {
       setError("Connector is unavailable");
       return;
     }
 
-    if (!wsInitialized && isConnectorAvailable) {
-      setupGlobalWebSocket(isConnectorAvailable);
-      wsInitialized = true;
-    }
-
-    const listenerId = Date.now().toString() + Math.random().toString();
-    listenerIdRef.current = listenerId;
-
     if (isConnectorAvailable) {
-      globalWsListeners.push({
-        id: listenerId,
-        onOpen: () => setWsConnected(true),
-        onClose: () => setWsConnected(false),
-        onMessage: handleWsMessage,
-        onError: () => setWsConnected(false)
-      });
-
-      if (globalWsRef && globalWsRef.readyState === WebSocket.OPEN) {
-        setWsConnected(true);
-      }
-
       const init = async () => {
         await scanNetworks(true);
         await fetchNetworkStatus();
@@ -348,19 +296,18 @@ export function useWiFiNetworks() {
 
       init();
 
+      // Set up periodic scanning
       pollingIntervalRef.current = setInterval(() => {
         scanNetworks(false);
       }, 60000);
     }
 
     return () => {
-      globalWsListeners = globalWsListeners.filter(listener => listener.id !== listenerId);
-
       if (pollingIntervalRef.current) {
         clearInterval(pollingIntervalRef.current);
       }
     };
-  }, [scanNetworks, fetchNetworkStatus, handleWsMessage, isConnectorAvailable, isConnectorLoading]);
+  }, [scanNetworks, fetchNetworkStatus, isConnectorAvailable, isConnectorLoading]);
 
   return {
     currentNetwork,
