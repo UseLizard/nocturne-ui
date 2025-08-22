@@ -1,5 +1,5 @@
 import React, { useRef, useCallback, useState, useEffect, useMemo, memo } from 'react';
-import { useNocturnedMedia } from '../../hooks/useNocturnedMedia';
+import { useLocalMedia } from '../../hooks/useLocalMedia';
 import { useNavigation } from '../../hooks/useNavigation';
 import { useGestureControls } from '../../hooks/useGestureControls';
 import { useGradientState } from '../../hooks/useGradientState';
@@ -8,6 +8,7 @@ import ScrollingText from '../common/ScrollingText';
 import DoubleBufferedImage from '../common/DoubleBufferedImage';
 import LiveAlbumArt from '../common/LiveAlbumArt';
 import TrackInfoTextLive from './TrackInfoTextLive';
+import LiveProgressBar from './LiveProgressBar';
 import {
   BluetoothIcon,
   SmartphoneIcon,
@@ -23,180 +24,6 @@ import {
   RepeatIcon
 } from '../common/icons';
 
-// Progress Bar Component for Local Media - Simplified without animations
-const LocalMediaProgressBar = memo(({
-  progress,
-  isPlaying,
-  durationMs,
-  positionMs,
-  onSeek,
-  onScrubbingChange,
-  updateProgress,
-}) => {
-  const [isScrubbing, setIsScrubbing] = useState(false);
-  const [scrubbingProgress, setScrubbingProgress] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const containerRef = useRef(null);
-  const progressBarRef = useRef(null);
-
-  const handleClick = (e) => {
-    if (!isDragging && progressBarRef.current) {
-      // Direct seek on click
-      const rect = progressBarRef.current.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
-      const seekMs = Math.floor((percentage / 100) * durationMs);
-      onSeek(seekMs);
-      updateProgress?.(seekMs);
-    } else {
-      // Old wheel-based scrubbing behavior
-      setIsScrubbing(true);
-      onScrubbingChange?.(true);
-    }
-  };
-
-  const handleMouseDown = (e) => {
-    setIsDragging(true);
-    handleDrag(e);
-  };
-
-  const handleDrag = (e) => {
-    if (!progressBarRef.current) return;
-    const rect = progressBarRef.current.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const percentage = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
-    setScrubbingProgress(percentage);
-  };
-
-  useEffect(() => {
-    if (!isDragging) return;
-
-    const handleMouseMove = (e) => {
-      handleDrag(e);
-    };
-
-    const handleMouseUp = () => {
-      if (scrubbingProgress !== null) {
-        const seekMs = Math.floor((scrubbingProgress / 100) * durationMs);
-        onSeek(seekMs);
-        updateProgress?.(seekMs);
-      }
-      setIsDragging(false);
-      setScrubbingProgress(null);
-    };
-
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
-
-    return () => {
-      document.removeEventListener('mousemove', handleMouseMove);
-      document.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [isDragging, scrubbingProgress, durationMs, onSeek, updateProgress]);
-
-  useEffect(() => {
-    if (!isScrubbing) return;
-
-    const handleWheel = (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const delta = event.deltaX;
-      const step = 1.5;
-
-      setScrubbingProgress((prev) => {
-        const nextValue = (prev ?? progress) + (delta > 0 ? step : -step);
-        return Math.max(0, Math.min(100, nextValue));
-      });
-    };
-
-    window.addEventListener("wheel", handleWheel, { passive: false });
-    return () => window.removeEventListener("wheel", handleWheel);
-  }, [isScrubbing, progress]);
-
-  useEffect(() => {
-    const handleKeyDown = (event) => {
-      if (event.key === "Enter" && isScrubbing) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-
-        setIsScrubbing(false);
-        onScrubbingChange?.(false);
-
-        if (scrubbingProgress !== null) {
-          const seekMs = Math.floor((scrubbingProgress / 100) * durationMs);
-          onSeek(seekMs);
-          updateProgress?.(seekMs);
-        }
-
-        setScrubbingProgress(null);
-        return false;
-      } else if (event.key === "Escape" && isScrubbing) {
-        event.preventDefault();
-        event.stopPropagation();
-        event.stopImmediatePropagation();
-        setIsScrubbing(false);
-        onScrubbingChange?.(false);
-        setScrubbingProgress(null);
-        return false;
-      }
-    };
-
-    window.addEventListener("keydown", handleKeyDown, { capture: true });
-    return () =>
-      window.removeEventListener("keydown", handleKeyDown, { capture: true });
-  }, [isScrubbing, scrubbingProgress, durationMs, onSeek, onScrubbingChange, updateProgress]);
-
-  const finalProgress = scrubbingProgress ?? progress;
-  const shouldShowTimestampOutside = finalProgress < 8;
-
-  const formatTime = (ms) => {
-    const totalSeconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(totalSeconds / 60);
-    const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
-  };
-
-  return (
-    <div
-      ref={containerRef}
-      className={`relative transition-all duration-200 ease-in-out ${isScrubbing || isDragging ? "translate-y-8" : ""}`}
-    >
-      <div
-        ref={progressBarRef}
-        className={`relative w-full bg-white/20 rounded-full overflow-hidden transition-all duration-300 cursor-pointer ${isScrubbing || isDragging ? "h-8" : "h-2 mt-4"}`}
-        onClick={handleClick}
-        onMouseDown={handleMouseDown}
-      >
-        <div
-          className="absolute left-0 top-0 h-full bg-white flex items-center justify-end"
-          style={{
-            width: `${finalProgress}%`,
-          }}
-        />
-        {(isScrubbing || isDragging) && (
-          <div
-            className="absolute inset-0 flex items-center"
-            style={{
-              transform: `translateX(${finalProgress}%)`,
-            }}
-          >
-            <span
-              className={`text-lg font-[580] absolute ${shouldShowTimestampOutside
-                ? "left-2 text-black/40"
-                : "right-full pr-2 text-black/40"
-              }`}
-            >
-              {formatTime(Math.floor((finalProgress / 100) * durationMs))}
-            </span>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-});
-
-LocalMediaProgressBar.displayName = 'LocalMediaProgressBar';
 
 // Volume control configuration
 const VOLUME_MIN = 0;
@@ -241,7 +68,6 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
   const scrubbingTimeoutRef = useRef(null);
   const scrubbingStartPositionRef = useRef(null);
   const lastSeekTimeRef = useRef(0);
-  const [debouncedIsPlaying, setDebouncedIsPlaying] = useState(false);
   const lastVolumeChangeTimeRef = useRef(0);
   const [debouncedVolume, setDebouncedVolume] = useState(50);
   
@@ -261,22 +87,37 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     currentTrack,
     currentArtist,
     currentAlbum,
-    isPlaying,
-    duration,
-    position,
+    isPlaying: isPlayingFromHook,
+    duration: durationMs,
+    position: positionMs,
     volume,
     togglePlayPause,
     next,
     previous,
     seekTo,
     setVolume,
-    formatTime,
     checkMediaStatus: refreshMediaState,
-    initialLoadComplete
-  } = useNocturnedMedia();
+    initialLoadComplete,
+    albumArtUrl: mediaAlbumArtUrl
+  } = useLocalMedia();
+
+  const [isPlaying, setIsPlaying] = useState(isPlayingFromHook || false);
+  useEffect(() => {
+    if (typeof isPlayingFromHook === 'boolean') {
+      setIsPlaying(isPlayingFromHook);
+    }
+  }, [isPlayingFromHook]);
   
   // Use position from nocturned directly - it provides live updates via WebSocket
-  const currentPosition = position;
+  const currentPosition = positionMs;
+  const [duration, setDuration] = useState(durationMs || 0);
+
+  useEffect(() => {
+    if (durationMs) {
+      setDuration(durationMs);
+    }
+  }, [durationMs]);
+  
   
   // Album art URL - LiveAlbumArt component handles the actual loading
   const albumArtUrl = (currentTrack || currentAlbum || currentArtist) ? 
@@ -287,10 +128,12 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
   };
 
   const handlePlayPause = useCallback(async () => {
+    // Use the exact same approach as LockScreen - just call togglePlayPause
+    await refreshMediaState();
     await togglePlayPause();
     // Force repaint to ensure UI updates are immediately visible
     forceRepaint();
-  }, [togglePlayPause, forceRepaint]);
+  }, [togglePlayPause, forceRepaint, refreshMediaState]);
 
   const handleSkipNext = useCallback(async () => {
     await next();
@@ -323,7 +166,16 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
   const handleTrackChange = useCallback((trackInfo) => {
     // Update gradient when track changes
     console.log('🎵 LOCAL MEDIA PLAYER: Track changed:', trackInfo);
+    if (trackInfo && typeof trackInfo.duration === 'number') {
+      setDuration(trackInfo.duration);
+    }
     // This will trigger album art reload which will update the gradient
+  }, []);
+
+  const handleStateChange = useCallback((newState) => {
+    if (newState && typeof newState.is_playing === 'boolean') {
+      setIsPlaying(newState.is_playing);
+    }
   }, []);
 
   // Calculate progress percentage - updates with live position
@@ -366,13 +218,13 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     enableKeyboardNavigation: true,
     onEscape: onClose,
     onEnterKey: handlePlayPause,
-    activeSection: "media",
+    activeSection: "nowPlaying",
   });
 
   // Track tap timing for tap-to-play/pause
   const touchStartTimeRef = useRef(null);
   const touchStartPosRef = useRef(null);
-  const [isTapping, setIsTapping] = useState(false);
+  const isTappingRef = useRef(false);
 
   // Enable swipe gestures for track navigation
   useGestureControls({
@@ -397,7 +249,7 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
         e.preventDefault(); // Prevent default touch behavior
         touchStartTimeRef.current = Date.now();
         touchStartPosRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
-        setIsTapping(true);
+        isTappingRef.current = true;
       }
     };
 
@@ -419,12 +271,12 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
         }
         touchStartTimeRef.current = null;
         touchStartPosRef.current = null;
-        setIsTapping(false);
+        isTappingRef.current = false;
         return;
       }
 
       // Handle tap-to-play/pause
-      if (!touchStartTimeRef.current || !touchStartPosRef.current || !isTapping) return;
+      if (!touchStartTimeRef.current || !touchStartPosRef.current || !isTappingRef.current) return;
 
       const touchDuration = Date.now() - touchStartTimeRef.current;
       const touchEndPos = { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
@@ -440,13 +292,13 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
 
       touchStartTimeRef.current = null;
       touchStartPosRef.current = null;
-      setIsTapping(false);
+      isTappingRef.current = false;
     };
 
     const handleTouchCancel = () => {
       touchStartTimeRef.current = null;
       touchStartPosRef.current = null;
-      setIsTapping(false);
+      isTappingRef.current = false;
     };
 
     element.addEventListener('touchstart', handleTouchStart, { passive: false });
@@ -458,7 +310,7 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
       element.removeEventListener('touchend', handleTouchEnd);
       element.removeEventListener('touchcancel', handleTouchCancel);
     };
-  }, [handlePlayPause, isTapping, scrubbingMode, seekTo]);
+  }, [handlePlayPause, scrubbingMode, seekTo]);
 
   // Removed: Complex album art checking logic - now handled by LiveAlbumArt component
 
@@ -470,16 +322,7 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     };
   }, []);
 
-  // Debounce isPlaying state to prevent flicker after seeking
-  useEffect(() => {
-    const now = Date.now();
-    const timeSinceLastSeek = now - lastSeekTimeRef.current;
-    
-    // If no seek has happened yet (initialization), or enough time has passed, update immediately
-    if (lastSeekTimeRef.current === 0 || timeSinceLastSeek >= 333) {
-      setDebouncedIsPlaying(isPlaying);
-    }
-  }, [isPlaying]);
+  // Removed debouncing as we're using optimistic state now
 
   // Debounce volume state to prevent flicker after volume changes
   useEffect(() => {
@@ -492,7 +335,7 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
     }
   }, [volume]);
 
-  // Handle Enter key (scroll wheel button press) for play/pause or hold for scrubbing
+  // Handle Enter key (scroll wheel button press) for play/pause or scrubbing exit
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.key === '1') {
@@ -512,47 +355,35 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
         e.stopPropagation();
         
         if (scrubbingMode) {
-          // Already in scrubbing mode, don't do anything on keydown
-          return;
-        }
-        
-        // Just play/pause on Enter press when not scrubbing
-        handlePlayPause();
-      }
-    };
-    
-    const handleKeyUp = (e) => {
-      if (e.key === 'Enter' && scrubbingMode) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Exit scrubbing mode and apply seek
-        setScrubbingPosition(currentPos => {
-          if (currentPos !== null) {
-            seekTo(currentPos);
-            lastSeekTimeRef.current = Date.now(); // Mark seek time
+          // Exit scrubbing mode and apply seek
+          setScrubbingPosition(currentPos => {
+            if (currentPos !== null) {
+              seekTo(currentPos);
+              lastSeekTimeRef.current = Date.now(); // Mark seek time
+            }
+            return null;
+          });
+          setScrubbingMode(false);
+          scrubbingStartPositionRef.current = null;
+          if (scrubbingTimeoutRef.current) {
+            clearTimeout(scrubbingTimeoutRef.current);
+            scrubbingTimeoutRef.current = null;
           }
-          return null;
-        });
-        setScrubbingMode(false);
-        scrubbingStartPositionRef.current = null;
-        if (scrubbingTimeoutRef.current) {
-          clearTimeout(scrubbingTimeoutRef.current);
-          scrubbingTimeoutRef.current = null;
+          // Force repaint to hide scrubbing mode immediately
+          forceRepaint();
+        } else {
+          // When not in scrubbing mode, Enter key toggles play/pause
+          handlePlayPause();
         }
-        // Force repaint to hide scrubbing mode immediately
-        forceRepaint();
       }
     };
 
     document.addEventListener('keydown', handleKeyDown, true);
-    document.addEventListener('keyup', handleKeyUp, true);
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true);
-      document.removeEventListener('keyup', handleKeyUp, true);
     };
-  }, [scrubbingMode, position, seekTo, handlePlayPause, forceRepaint]);
+  }, [scrubbingMode, currentPosition, seekTo, handlePlayPause, forceRepaint]);
 
   // Show volume overlay with animation
   const showVolumeOverlay = useCallback(() => {
@@ -703,9 +534,9 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
   }, [volume, showVolumeOverlay, manualVolumeChangeRef]);
 
 
-  // Play/Pause icon based on debounced state to prevent flicker after seeking
+  // Play/Pause icon based on actual isPlaying state from useLocalMedia
   const PlayPauseIcon = () => {
-    return debouncedIsPlaying ? (
+    return isPlaying ? (
       <PauseIcon className="w-14 h-14" />
     ) : (
       <PlayIcon className="w-14 h-14" />
@@ -867,6 +698,7 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
           <TrackInfoTextLive 
             isConnected={isConnected}
             onTrackChange={handleTrackChange}
+            onStateChange={handleStateChange}
           />
         </div>
       </div>
@@ -875,31 +707,14 @@ const LocalMediaPlayer = ({ className = "", onClose }) => {
       <div className="flex-shrink-0">
         {/* Progress Bar */}
         <div className="px-12 pb-4">
-          <LocalMediaProgressBar
-            progress={progressPercentage}
+          <LiveProgressBar
             isPlaying={isPlaying}
             durationMs={duration || 0}
-            positionMs={currentPosition || 0}
             onSeek={handleSeek}
             onScrubbingChange={(scrubbing) => {
               // Handle scrubbing state if needed for disabling other controls
             }}
-            updateProgress={(newPosition) => {
-              // Could update position state for immediate feedback
-            }}
           />
-          
-          {/* Time display */}
-          {isConnected && duration && (
-            <div className="flex justify-between mt-2">
-              <span className="text-white/60 text-[20px]">
-                {convertTimeToLength(currentPosition)}
-              </span>
-              <span className="text-white/60 text-[20px]">
-                {convertTimeToLength(duration)}
-              </span>
-            </div>
-          )}
         </div>
 
         {/* Media Controls - Enhanced for Song/Podcast Mode */}

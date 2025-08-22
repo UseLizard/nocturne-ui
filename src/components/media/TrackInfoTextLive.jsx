@@ -2,7 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import ScrollingText from '../common/ScrollingText';
 
 // Direct connection to nocturned backend for live track info
-const NOCTURNED_BASE = 'http://localhost:5000';
+const NOCTURNED_BASE = window.location.hostname === 'localhost' 
+  ? 'http://localhost:5000' 
+  : `http://${window.location.hostname}:5000`;
 
 let globalTrackWs = null;
 let globalTrackListeners = [];
@@ -13,7 +15,9 @@ const setupTrackWebSocket = async () => {
 
   try {
     console.log('🎵 TrackInfo: Connecting to nocturned WebSocket...');
-    const socket = new WebSocket(`ws://localhost:5000/ws`);
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsHost = window.location.hostname === 'localhost' ? 'localhost:5000' : `${window.location.hostname}:5000`;
+    const socket = new WebSocket(`${wsProtocol}//${wsHost}/ws`);
     globalTrackWs = socket;
 
     socket.onopen = () => {
@@ -57,7 +61,8 @@ const setupTrackWebSocket = async () => {
 const TrackInfoTextLive = ({ 
   isConnected: parentIsConnected, 
   className = "",
-  onTrackChange 
+  onTrackChange,
+  onStateChange
 }) => {
   const [trackInfo, setTrackInfo] = useState({
     track: null,
@@ -118,6 +123,8 @@ const TrackInfoTextLive = ({
         console.log('🎵 TrackInfo: Media state update received:', data.payload);
         const newState = data.payload;
         
+        onStateChange?.(newState);
+        
         const newTrackInfo = {
           track: newState.track || null,
           artist: newState.artist || null,
@@ -159,7 +166,7 @@ const TrackInfoTextLive = ({
         // Ignore other message types
         break;
     }
-  }, [onTrackChange, getInitialTrackInfo]);
+  }, [onTrackChange, onStateChange, getInitialTrackInfo]);
 
   // Setup WebSocket connection and listener
   useEffect(() => {

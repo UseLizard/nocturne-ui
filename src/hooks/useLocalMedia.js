@@ -81,9 +81,15 @@ export const useLocalMedia = () => {
   const debouncedVolumeCommand = useCallback(debounce((vol) => sendCommand('volume', { volumePercent: vol }), 250), [sendCommand]);
 
   // --- UI Actions ---
-  const togglePlayPause = useCallback(() => sendCommand(isPlaying ? 'pause' : 'play'), [sendCommand, isPlaying]);
-  const next = useCallback(() => sendCommand('next'), [sendCommand]);
-  const previous = useCallback(() => sendCommand('previous'), [sendCommand]);
+  const togglePlayPause = useCallback(() => {
+    return sendCommand(isPlaying ? 'pause' : 'play');
+  }, [sendCommand, isPlaying]);
+  const next = useCallback(() => {
+    return sendCommand('next');
+  }, [sendCommand]);
+  const previous = useCallback(() => {
+    return sendCommand('previous');
+  }, [sendCommand]);
 
   const seekTo = useCallback((positionMs) => {
     isSeekingRef.current = true;
@@ -136,13 +142,57 @@ export const useLocalMedia = () => {
           lastServerStateRef.current.position_ms = position_ms || 0;
         }
       }
+    } else if (data.type === 'playing_time') {
+      // Handle live position and duration updates from the backend ticker
+      const { position_ms, duration_ms } = data.payload;
+      console.log('🎵 useLocalMedia: Received playing_time update:', { position_ms, duration_ms });
+      
+      // Update client position for smooth animation
+      if (!isSeekingRef.current) {
+        setClientPosition(position_ms || 0);
+        lastClientUpdateRef.current = Date.now();
+      }
+      
+      // Update stored server state
+      if (lastServerStateRef.current) {
+        lastServerStateRef.current.position_ms = position_ms;
+        // Update duration if it's provided and different
+        if (duration_ms && lastServerStateRef.current.duration_ms !== duration_ms) {
+          lastServerStateRef.current.duration_ms = duration_ms;
+          console.log('🎵 useLocalMedia: Updated duration from playing_time:', duration_ms);
+        }
+      }
+      
+      // Update media state with new duration if needed
+      setMediaState(prev => {
+        if (prev && duration_ms && prev.duration_ms !== duration_ms) {
+          console.log('🎵 useLocalMedia: Updating mediaState duration from playing_time:', duration_ms);
+          // Ensure we return a new object reference to trigger re-render
+          return { ...prev, duration_ms };
+        }
+        return prev;
+      });
     } else if (data.type === 'media/state_update') {
+      // Only handle properly formatted media/state_update messages with parsed JavaScript objects
+      // The media_state_update messages contain raw binary data that we cannot parse in the frontend
       const serverState = data.payload;
+      console.log('🎵 useLocalMedia: Received media/state_update:', serverState);
       const isTrackChange = lastServerStateRef.current?.track !== serverState.track;
       
       // Reset timestamp sync flag on track change
       if (isTrackChange) {
+        console.log('🎵 useLocalMedia: Track changed from', lastServerStateRef.current?.track, 'to', serverState.track);
         setTimestampSynced(false);
+      }
+      
+      // Log play state changes
+      if (lastServerStateRef.current?.is_playing !== serverState.is_playing) {
+        console.log('🎵 useLocalMedia: Play state changed from', lastServerStateRef.current?.is_playing, 'to', serverState.is_playing);
+      }
+      
+      // Log duration changes
+      if (lastServerStateRef.current?.duration_ms !== serverState.duration_ms) {
+        console.log('🎵 useLocalMedia: Duration changed from', lastServerStateRef.current?.duration_ms, 'to', serverState.duration_ms);
       }
       
       // Clear client volume override when server confirms
@@ -162,7 +212,14 @@ export const useLocalMedia = () => {
         lastClientUpdateRef.current = Date.now();
       }
       
-      setMediaState(serverState);
+      console.log('🎵 useLocalMedia: Updating mediaState with:', {
+        track: serverState.track,
+        duration_ms: serverState.duration_ms,
+        is_playing: serverState.is_playing,
+        position_ms: serverState.position_ms
+      });
+      // Use spread operator to ensure new object reference and trigger React re-render
+      setMediaState({ ...serverState });
 
       // If the track changed or we aren't seeking, sync the position.
       // Skip position sync if we're waiting for timestamp_sync after track change
